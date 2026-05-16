@@ -22,6 +22,14 @@ cafe-fe-app/
 ├── components.json         # Konfigurasi Shadcn/UI
 │
 ├── public/                 # Static assets (svg, images)
+│   └── images/
+│       └── cafe/           # 6 editorial-quality images untuk landing page
+│           ├── hero.png
+│           ├── food-spread.png
+│           ├── signature-drink.png
+│           ├── interior.png
+│           ├── dessert.png
+│           └── pasta.png
 └── src/                    # Source code utama
 ```
 
@@ -35,7 +43,8 @@ src/
 │   ├── favicon.ico               # Favicon
 │   │
 │   ├── (public)/                 # 🌐 Area publik / customer-facing
-│   │   └── page.tsx              # Homepage (saat ini: ClientDemo)
+│   │   ├── layout.tsx            # Layout publik (Cormorant Garamond + Manrope fonts)
+│   │   └── page.tsx              # Landing page (11 section cinematic)
 │   │
 │   ├── (admin)/                  # 🔒 Area dashboard admin
 │   │   ├── layout.tsx            # Admin shell (AdminSidebar + AdminHeader + main)
@@ -158,7 +167,19 @@ src/
 │   │   ├── admin-sidebar.tsx     # Sidebar navigasi (collapsible, 2 section)
 │   │   └── admin-header.tsx      # Header (search, theme toggle, profile dropdown)
 │   │
-│   ├── public/                   # Komponen area publik (kosong — belum dibangun)
+│   ├── public/                   # 12 komponen landing page cafe (Savoria)
+│   │   ├── navbar.tsx            # Navbar (transparan → solid on scroll, active section tracking)
+│   │   ├── hero-section.tsx      # Hero fullscreen (auto-rotating slides, Ken Burns zoom)
+│   │   ├── about-section.tsx     # About + image collage + floating stats card
+│   │   ├── featured-menu-section.tsx  # 3 signature menu cards (dark bg)
+│   │   ├── menu-preview-section.tsx   # Interactive menu grid + 11 kategori + search
+│   │   ├── gallery-section.tsx   # Masonry gallery + fullscreen lightbox
+│   │   ├── testimonials-section.tsx   # 4 review cards + social proof bar
+│   │   ├── events-section.tsx    # Events & promotions (dark bg)
+│   │   ├── reservation-section.tsx    # Table reservation form
+│   │   ├── cta-section.tsx       # CTA section + marquee ticker
+│   │   ├── location-section.tsx  # Google Maps embed + contact info cards
+│   │   └── footer.tsx            # Footer (brand, 3 kolom link, social icons)
 │   │
 │   ├── theme-provider.tsx        # Wrapper next-themes (client component)
 │   └── client-demo.tsx           # Demo Zustand + React Query (client component)
@@ -172,9 +193,11 @@ src/
 ├── lib/
 │   └── utils.ts                  # cn() helper (clsx + tailwind-merge)
 │
+├── hooks/
+│   └── use-scroll-reveal.ts      # IntersectionObserver hook untuk scroll animations
+│
 ├── features/                     # 🏗️ BELUM ADA — domain bisnis modular
 ├── services/                     # 🏗️ BELUM ADA — API layer global
-├── hooks/                        # 🏗️ BELUM ADA — custom hooks global
 ├── utils/                        # 🏗️ BELUM ADA — utility global
 ├── constants/                    # 🏗️ BELUM ADA — konstanta global
 ├── types/                        # 🏗️ BELUM ADA — TypeScript types global

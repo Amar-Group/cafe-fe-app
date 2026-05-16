@@ -21,7 +21,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | **Framework** | Next.js 16 (App Router) |
 | **Bahasa** | TypeScript (strict: false) |
 | **Package Manager** | **Bun** (satu-satunya — jangan gunakan npm/yarn/pnpm) |
-| **Styling** | Tailwind CSS v3 + CSS Variables (oklch) |
+| **Styling** | Tailwind CSS v3 + CSS Variables (oklch untuk admin, RGB channels untuk public) |
 | **UI Kit** | Shadcn/UI (style: `base-nova`, base color: `neutral`) |
 | **State Management** | Zustand |
 | **Data Fetching** | TanStack React Query |
@@ -30,6 +30,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | **Rich Text** | Tiptap |
 | **Icons** | Lucide React |
 | **Theme** | `next-themes` (light default, dark mode via class strategy) |
+| **Animation** | Framer Motion + CSS scroll-reveal animations |
 
 ---
 
@@ -55,7 +56,8 @@ src/
 │   ├── globals.css               # Global CSS + Tailwind + CSS vars
 │   │
 │   ├── (public)/                 # 🌐 Halaman publik/customer-facing
-│   │   └── page.tsx              # Homepage / Landing Page
+│   │   ├── layout.tsx            # Layout publik (Cormorant Garamond + Manrope)
+│   │   └── page.tsx              # Landing page (11 section cinematic)
 │   │
 │   ├── (admin)/                  # 🔒 Dashboard admin (sidebar + header)
 │   │   ├── layout.tsx            # Admin shell: sidebar + header + main
@@ -94,7 +96,19 @@ src/
 │   ├── layout/                   # Admin shell components
 │   │   ├── admin-sidebar.tsx     # Sidebar navigasi + collapsible menu
 │   │   └── admin-header.tsx      # Header + search + theme toggle + profile
-│   ├── public/                   # Komponen untuk area publik (kosong saat ini)
+│   ├── public/                   # 12 komponen landing page cafe
+│   │   ├── navbar.tsx            # Navbar (transparan → solid on scroll, active tracking)
+│   │   ├── hero-section.tsx      # Hero fullscreen (auto-rotate slides, Ken Burns)
+│   │   ├── about-section.tsx     # About + image collage + feature highlights
+│   │   ├── featured-menu-section.tsx  # 3 signature menu cards (dark bg)
+│   │   ├── menu-preview-section.tsx   # Interactive menu grid + filter + search
+│   │   ├── gallery-section.tsx   # Masonry gallery + lightbox
+│   │   ├── testimonials-section.tsx   # Review cards + social proof bar
+│   │   ├── events-section.tsx    # Events & promotions (dark bg)
+│   │   ├── reservation-section.tsx    # Table reservation form
+│   │   ├── cta-section.tsx       # CTA + marquee ticker
+│   │   ├── location-section.tsx  # Google Maps + contact info
+│   │   └── footer.tsx            # Footer (brand, links, social)
 │   ├── theme-provider.tsx        # Wrapper next-themes
 │   └── client-demo.tsx           # Demo komponen (Zustand + React Query)
 │
@@ -107,9 +121,11 @@ src/
 ├── lib/
 │   └── utils.ts                  # `cn()` helper (clsx + tailwind-merge)
 │
+├── hooks/
+│   └── use-scroll-reveal.ts      # IntersectionObserver hook untuk scroll animations
+│
 ├── features/                     # 🏗️ BELUM ADA — untuk fitur domain bisnis
 ├── services/                     # 🏗️ BELUM ADA — untuk API layer global
-├── hooks/                        # 🏗️ BELUM ADA — untuk custom hooks global
 ├── utils/                        # 🏗️ BELUM ADA — untuk utility global
 ├── constants/                    # 🏗️ BELUM ADA — untuk konstanta global
 ├── types/                        # 🏗️ BELUM ADA — untuk TypeScript types global
@@ -124,7 +140,7 @@ Proyek ini menggunakan **Route Groups** (`(nama)`) agar halaman dengan layout be
 
 | Route Group | Layout | Kegunaan | Ciri Khas |
 |---|---|---|---|
-| `(public)` | Tanpa layout khusus (langsung root) | Landing page, halaman customer | Belum ada layout sendiri |
+| `(public)` | Layout khusus (font Cormorant Garamond + Manrope, smooth scroll) | Landing page cafe (11 section) | Navbar, Hero, About, Menu, Gallery, Testimonials, Events, Reservation, CTA, Location, Footer |
 | `(admin)` | Sidebar + Header + Main | Dashboard & semua fitur admin | `AdminSidebar` + `AdminHeader` |
 | `(auth)` | Minimal (bg biru muda) | Login, register, dll | Tanpa navigasi |
 | `(error)` | Centered (bg biru muda) | Halaman error HTTP | Centered + flex |
@@ -139,33 +155,77 @@ Proyek ini menggunakan **Route Groups** (`(nama)`) agar halaman dengan layout be
 
 ## 5. Design System & Theming
 
-### CSS Variables (oklch)
-Semua warna didefinisikan di `globals.css` menggunakan format **oklch**:
+### A. Admin Design System (oklch)
+Semua warna admin didefinisikan di `globals.css` menggunakan format **oklch**:
 - Light mode: `:root { ... }`
 - Dark mode: `.dark { ... }`
 
-### Semantic Color Tokens
+### Semantic Color Tokens (Admin)
 ```
 background, foreground, card, popover, primary, secondary,
 destructive, muted, accent, border, input, ring,
 chart-1~5, sidebar-*
 ```
 
-### Tailwind Integration
-Warna Tailwind di-mapping ke CSS variables di `tailwind.config.js`:
+### B. Cafe Public Design System (RGB Channels)
+Warna untuk area publik (landing page) menggunakan format **RGB channels** agar mendukung Tailwind opacity modifier (`text-cafe-charcoal/70`):
+
+```css
+/* globals.css */
+:root {
+  --cafe-cream: 245 240 232;
+  --cafe-charcoal: 42 42 42;
+  --cafe-brown: 139 111 71;
+  /* ... dst */
+}
+```
+
 ```js
-colors: {
-  background: "var(--background)",
-  primary: { DEFAULT: "var(--primary)", foreground: "var(--primary-foreground)" },
+/* tailwind.config.js */
+cafe: {
+  cream: "rgb(var(--cafe-cream) / <alpha-value>)",
+  charcoal: "rgb(var(--cafe-charcoal) / <alpha-value>)",
   // ... dst
 }
 ```
 
+### Cafe Color Palette
+| Token | RGB | Hex Equiv. | Kegunaan |
+|---|---|---|---|
+| `cafe-cream` | 245 240 232 | `#F5F0E8` | Background utama light sections |
+| `cafe-warm-white` | 250 250 246 | `#FAFAF6` | Background sections lebih terang |
+| `cafe-charcoal` | 42 42 42 | `#2A2A2A` | Text utama, dark section bg |
+| `cafe-dark` | 26 26 26 | `#1A1A1A` | Darkest background |
+| `cafe-brown` | 139 111 71 | `#8B6F47` | Primary accent, headings |
+| `cafe-brown-light` | 184 149 106 | `#B8956A` | Secondary accent |
+| `cafe-orange` | 200 121 65 | `#C87941` | CTA, highlights, badges |
+| `cafe-olive` | 107 125 62 | `#6B7D3E` | Nature/success accent |
+| `cafe-sand` | 232 221 208 | `#E8DDD0` | Borders, muted bg |
+| `cafe-latte` | 212 197 178 | `#D4C5B2` | Dividers, subtle elements |
+
+### Cafe Typography
+| Font | Variabel | Kegunaan |
+|---|---|---|
+| **Cormorant Garamond** | `font-display` | Headings, section titles |
+| **Manrope** | `font-body` | Body text, UI elements |
+
+### Cafe Animations (CSS)
+- `cafe-reveal`, `cafe-reveal-left`, `cafe-reveal-right` — scroll-triggered reveal
+- `cafe-stagger` — staggered children animation delay
+- `cafe-noise` — noise texture overlay
+- `animate-kenburns` — Ken Burns zoom pada hero slides
+- `animate-float` — floating decorative elements
+- `animate-marquee` — horizontal text ticker
+
+> ⚠️ **PENTING**: Gunakan format RGB channels untuk warna cafe, BUKAN hex. Tailwind opacity modifier (`/70`, `/50`) hanya bekerja dengan format `rgb(var(...) / <alpha-value>)`.
+
 ### Aturan Styling
-1. **Gunakan semantic color** (e.g. `bg-background`, `text-foreground`, `border-border`) — BUKAN hardcoded hex/rgb
-2. **Dark mode otomatis** via CSS variables — tidak perlu prefix `dark:`
-3. **`cn()` helper** wajib digunakan untuk menggabungkan class conditional
-4. Komponen UI base dari **shadcn/ui** — cek `src/components/ui/` sebelum buat komponen baru
+1. **Admin area** → gunakan semantic color (`bg-background`, `text-foreground`) — oklch
+2. **Public area** → gunakan cafe color tokens (`bg-cafe-cream`, `text-cafe-charcoal`) — RGB
+3. **Dark mode** di admin area otomatis via CSS variables
+4. **`cn()` helper** wajib digunakan untuk class conditional
+5. Komponen UI base dari **shadcn/ui** — cek `src/components/ui/` sebelum buat baru
+6. Opacity modifier: `text-cafe-charcoal/70` (✅) BUKAN `text-cafe-charcoal opacity-70` (❌)
 
 ---
 
@@ -271,6 +331,7 @@ Sidebar admin memiliki 2 section utama:
 | `react-dropzone` | ^15.0 | File upload |
 | `react-select` | ^5.10 | Select dropdown advanced |
 | `shadcn` | ^4.7 | CLI untuk generate komponen |
+| `framer-motion` | ^12.38 | Animasi kompleks (future use) |
 
 ---
 
@@ -302,23 +363,41 @@ typescript: { ignoreBuildErrors: true }
 
 ## 12. Status Proyek
 
-Proyek ini masih dalam tahap **starter / boilerplate**. Fitur-fitur yang sudah ada:
+### Sudah Selesai
 - ✅ Admin dashboard layout (sidebar + header)
 - ✅ Theme switching (light/dark)
 - ✅ Komponen UI showcase (base-ui, extended-ui, charts, forms, tables, icons)
 - ✅ Halaman auth (login, register, recover-password, confirm-mail, login-pin)
 - ✅ Halaman error (400, 401, 403, 404, 500, 503)
 - ✅ Halaman standalone (coming-soon, maintenance)
-- ✅ Demo Zustand + React Query di homepage
+- ✅ Demo Zustand + React Query
+- ✅ **Landing page cafe** (11 section, premium cinematic design)
+  - Navbar (transparan → solid, scroll-based active tracking)
+  - Hero (fullscreen, auto-rotating slides, Ken Burns effect)
+  - About (image collage, stats card, feature highlights)
+  - Featured Menu (3 signature cards, dark bg)
+  - Interactive Menu Grid (11 kategori, search, badges, filter)
+  - Gallery (masonry grid, lightbox prev/next)
+  - Testimonials (4 review cards, social proof bar)
+  - Events & Promotions (live acoustic, happy hour, dll)
+  - Reservation Form (date, time, guests, seating preference)
+  - CTA (dual buttons, marquee ticker)
+  - Location (Google Maps embed, contact info, WhatsApp CTA)
+  - Footer (brand, 3 kolom link, social icons)
+- ✅ Custom hooks (`use-scroll-reveal`)
+- ✅ Cafe design system (warm palette, premium fonts, scroll animations)
+- ✅ 6 editorial-quality image assets (`public/images/cafe/`)
 
-Yang **belum ada** dan perlu dibangun:
-- ❌ Halaman publik / landing page cafe (saat ini hanya demo)
+### Belum Ada (Perlu Dibangun)
 - ❌ Feature modules (`src/features/`)
 - ❌ API service layer (`src/services/`)
-- ❌ Custom hooks global (`src/hooks/`)
 - ❌ Global types (`src/types/`)
 - ❌ Authentication logic (login flow, token, guards)
 - ❌ CRUD fitur domain bisnis (menu cafe, orders, dll)
+- ❌ Online ordering system (cart via Zustand, checkout flow)
+- ❌ Reservation backend integration
+- ❌ Dedicated menu page (full catalog)
+- ❌ User authentication & profile
 
 ---
 
@@ -327,10 +406,43 @@ Yang **belum ada** dan perlu dibangun:
 1. **Selalu baca file ini** sebelum memulai pekerjaan apapun
 2. **Gunakan Bun** — jangan pernah suggest/jalankan npm/yarn/pnpm
 3. **Ikuti folder structure** di `STRUCTURE.md` dan section 3 dokumen ini
-4. **Gunakan semantic color tokens** — jangan hardcode warna
-5. **Cek komponen yang sudah ada** di `src/components/ui/` sebelum buat baru
+4. **Gunakan semantic color tokens** — admin: `bg-background`, public: `bg-cafe-cream`
+5. **Cek komponen yang sudah ada** di `src/components/ui/` dan `src/components/public/` sebelum buat baru
 6. **Feature baru** → buat di `src/features/<nama>/` dengan sub-folder sesuai pattern
 7. **Jangan hapus komentar/docstring** yang sudah ada kecuali diminta
 8. **"use client"** wajib di komponen yang pakai hooks/events/browser API
 9. **Gunakan `cn()` helper** untuk class conditional, bukan string concatenation manual
 10. **Baca docs Next.js 16** di `node_modules/next/dist/docs/` bila ragu soal API
+11. **Cafe colors harus pakai format RGB channels** — bukan hex — agar Tailwind opacity modifier bekerja
+12. **Komponen publik** → taruh di `src/components/public/`, ikuti pattern scroll-reveal dan cafe design tokens
+13. **Scroll animations** → gunakan class `cafe-reveal` / `cafe-reveal-left` / `cafe-reveal-right` + hook `useScrollReveal`
+
+---
+
+## 14. Public Landing Page — Referensi Cepat
+
+### Section Order (di `page.tsx`)
+```
+CafeNavbar → HeroSection → AboutSection → FeaturedMenuSection →
+MenuPreviewSection → GallerySection → TestimonialsSection →
+EventsSection → ReservationSection → CtaSection →
+LocationSection → CafeFooter
+```
+
+### Section IDs (untuk navigasi)
+| Komponen | Section ID | Nav Link |
+|---|---|---|
+| `HeroSection` | `#hero` | Home |
+| `AboutSection` | `#about` | About |
+| `MenuPreviewSection` | `#menu` | Menu |
+| `GallerySection` | `#gallery` | Gallery |
+| `EventsSection` | `#events` | Events |
+| `LocationSection` | `#contact` | Contact |
+
+### Image Assets (`public/images/cafe/`)
+- `hero.png` — Cafe atmosphere hero shot
+- `food-spread.png` — Flat-lay food photography
+- `signature-drink.png` — Iced latte close-up
+- `interior.png` — Warm interior shot
+- `dessert.png` — Dessert plating
+- `pasta.png` — Gourmet pasta dish
