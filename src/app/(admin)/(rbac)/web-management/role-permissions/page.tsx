@@ -9,12 +9,21 @@ import { Badge } from "@/components/ui/badge";
 import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter, ModalClose } from "@/components/ui/modal";
 import { DataTable } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
-import { DUMMY_ROLES } from "@/features/rbac/role/constants/dummy-data";
-import { DUMMY_MENUS } from "@/features/rbac/menu/constants/dummy-data";
-import { DUMMY_ROLE_PERMISSIONS } from "@/features/rbac/role-permission/constants/dummy-data";
+import { useNotification } from "@/components/ui/notification";
+
 import type { Role } from "@/features/rbac/role/types";
 import type { Menu } from "@/features/rbac/menu/types";
 import type { RolePermission } from "@/features/rbac/role-permission/types";
+
+import { useRoles } from "@/features/rbac/role/hooks/use-role";
+import { useMenus } from "@/features/rbac/menu/hooks/use-menu";
+import {
+  useRolePermissions,
+  useCreateRolePermission,
+  useUpdateRolePermission,
+  useDeleteRolePermission,
+} from "@/features/rbac/role-permission/hooks/use-role-permission";
+import { usePermissions } from "@/features/rbac/user/hooks/use-user";
 
 /* ── Permission keys ── */
 const PERM_KEYS = ["can_read", "can_create", "can_update", "can_delete", "can_report"] as const;
@@ -35,15 +44,15 @@ const ICON_MAP: Record<string, LucideIcon> = {
 };
 
 /* ── Permission Checkbox ── */
-function PermCheck({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+function PermCheck({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
   return (
     <button
       onClick={onChange}
-      className={`inline-flex items-center justify-center size-7 rounded-full transition-all ${
-        checked
+      disabled={disabled}
+      className={`inline-flex items-center justify-center size-7 rounded-full transition-all ${checked
           ? "bg-green-500 text-white shadow-sm shadow-green-200"
           : "bg-muted text-muted-foreground hover:bg-muted/80"
-      }`}
+        } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
     >
       {checked ? <Check className="size-4" /> : <X className="size-3.5" />}
     </button>
@@ -51,23 +60,25 @@ function PermCheck({ checked, onChange }: { checked: boolean; onChange: () => vo
 }
 
 /* ── Per-menu permission state ── */
-type MenuPermState = Record<number, Record<string, boolean>>;
+type MenuPermState = Record<number, {
+  id?: number; // Keep track of existing permission ID
+  can_read: boolean;
+  can_create: boolean;
+  can_update: boolean;
+  can_delete: boolean;
+  can_report: boolean;
+}>;
 
-/**
- * Build initial permission state for a role.
- * Only includes menus that have a non-null `path` (real pages, not dropdown containers).
- */
 function buildPermState(roleId: number, perms: RolePermission[], menus: Menu[]): MenuPermState {
   const state: MenuPermState = {};
-  // Initialize all menus that have a path (they're real pages)
   for (const menu of menus) {
-    if (!menu.path) continue; // path is null → parent/dropdown → skip
+    if (!menu.path) continue;
     state[menu.id] = { can_read: false, can_create: false, can_update: false, can_delete: false, can_report: false };
   }
-  // Fill existing permissions
   for (const p of perms) {
     if (p.role_id === roleId && state[p.menu_id]) {
       state[p.menu_id] = {
+        id: p.id,
         can_read: p.can_read,
         can_create: p.can_create,
         can_update: p.can_update,
@@ -79,31 +90,17 @@ function buildPermState(roleId: number, perms: RolePermission[], menus: Menu[]):
   return state;
 }
 
-/* ── Group menus for the modal ── */
 interface MenuGroup {
   parent: Menu | null;
   children: Menu[];
 }
 
-/**
- * Groups menus by parent for the permission modal.
- *
- * Logic based on `path`:
- * - path === null  →  parent/dropdown container  →  shown as group header (no checkboxes)
- * - path !== null  →  real page  →  shown with checkboxes
- *
- * Standalone menus (path !== null, parent_id === null) are grouped under "Umum".
- */
 function groupMenus(menus: Menu[]): MenuGroup[] {
   const groups: MenuGroup[] = [];
-
-  // 1. Standalone menus (has path, no parent) → "Umum" group
   const standalones = menus.filter((m) => m.path && m.parent_id === null);
   if (standalones.length > 0) {
     groups.push({ parent: null, children: standalones });
   }
-
-  // 2. Parent menus (path is null) → group headers with their children
   const parents = menus.filter((m) => !m.path && m.parent_id === null);
   for (const parent of parents) {
     const children = menus.filter((m) => m.parent_id === parent.id && m.path);
@@ -111,87 +108,114 @@ function groupMenus(menus: Menu[]): MenuGroup[] {
       groups.push({ parent, children });
     }
   }
-
   return groups;
 }
 
 export default function RolePermissionsPage() {
-  const [perms, setPerms] = useState<RolePermission[]>(DUMMY_ROLE_PERMISSIONS);
+  const { data: roles = [], isLoading: loadingRoles } = useRoles();
+  const { data: menus = [], isLoading: loadingMenus } = useMenus();
+  const { data: perms = [], isLoading: loadingPerms } = useRolePermissions();
+  const permissions = usePermissions();
+  const { add } = useNotification();
+
+  const createPerm = useCreateRolePermission();
+  const updatePerm = useUpdateRolePermission();
+  const deletePerm = useDeleteRolePermission();
+
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [permState, setPermState] = useState<MenuPermState>({});
+  const [isSaving, setIsSaving] = useState(false);
 
-  const menuGroups = useMemo(() => groupMenus(DUMMY_MENUS), []);
+  const menuGroups = useMemo(() => groupMenus(menus), [menus]);
 
-  /* ── Open modal for a role ── */
   const openPermissions = (role: Role) => {
     setSelectedRole(role);
-    setPermState(buildPermState(role.id, perms, DUMMY_MENUS));
+    setPermState(buildPermState(role.id, perms, menus));
     setModalOpen(true);
   };
 
-  /* ── Toggle single perm ── */
   const togglePerm = (menuId: number, key: string) => {
+    if (isSaving) return;
     setPermState((prev) => ({
       ...prev,
       [menuId]: { ...prev[menuId], [key]: !prev[menuId]?.[key] },
     }));
   };
 
-  /* ── Check / Uncheck All ── */
   const setAll = (val: boolean) => {
+    if (isSaving) return;
     setPermState((prev) => {
       const next = { ...prev };
       for (const menuId of Object.keys(next)) {
         const mid = Number(menuId);
-        next[mid] = { can_read: val, can_create: val, can_update: val, can_delete: val, can_report: val };
+        next[mid] = { ...next[mid], can_read: val, can_create: val, can_update: val, can_delete: val, can_report: val };
       }
       return next;
     });
   };
 
-  /* ── Save ── */
-  const handleSave = () => {
-    if (!selectedRole) return;
-    const roleId = selectedRole.id;
+  const handleSave = async () => {
+    if (!selectedRole || isSaving) return;
+    setIsSaving(true);
 
-    // Remove old perms for this role, add new ones
-    const otherPerms = perms.filter((p) => p.role_id !== roleId);
-    const newPerms: RolePermission[] = [];
-    let nextId = Math.max(...perms.map((p) => p.id), 0) + 1;
+    try {
+      const roleId = selectedRole.id;
+      const promises: Promise<any>[] = [];
 
-    for (const [menuIdStr, permObj] of Object.entries(permState)) {
-      const menuId = Number(menuIdStr);
-      const menu = DUMMY_MENUS.find((m) => m.id === menuId);
-      const hasAny = Object.values(permObj).some(Boolean);
-      if (hasAny) {
-        newPerms.push({
-          id: nextId++,
-          role_id: roleId,
-          role_name: selectedRole.name,
-          menu_id: menuId,
-          menu_name: menu?.name,
-          can_read: permObj.can_read,
-          can_create: permObj.can_create,
-          can_update: permObj.can_update,
-          can_delete: permObj.can_delete,
-          can_report: permObj.can_report,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
+      for (const [menuIdStr, state] of Object.entries(permState)) {
+        const menuId = Number(menuIdStr);
+        const hasAny = state.can_read || state.can_create || state.can_update || state.can_delete || state.can_report;
+
+        if (state.id) {
+          // Existing permission
+          if (hasAny) {
+            // Update
+            promises.push(updatePerm.mutateAsync({
+              id: state.id,
+              data: {
+                role_id: roleId,
+                menu_id: menuId,
+                can_read: state.can_read,
+                can_create: state.can_create,
+                can_update: state.can_update,
+                can_delete: state.can_delete,
+                can_report: state.can_report,
+              }
+            }));
+          } else {
+            // All false -> Delete
+            promises.push(deletePerm.mutateAsync(state.id));
+          }
+        } else if (hasAny) {
+          // New permission -> Create
+          promises.push(createPerm.mutateAsync({
+            role_id: roleId,
+            menu_id: menuId,
+            can_read: state.can_read,
+            can_create: state.can_create,
+            can_update: state.can_update,
+            can_delete: state.can_delete,
+            can_report: state.can_report,
+          }));
+        }
       }
-    }
 
-    setPerms([...otherPerms, ...newPerms]);
-    setModalOpen(false);
+      await Promise.all(promises);
+      add({ title: "Berhasil", message: "Hak akses role berhasil diperbarui.", variant: "success" });
+      setModalOpen(false);
+    } catch (error: any) {
+      add({ title: "Gagal", message: error.message || "Terjadi kesalahan sistem saat memperbarui role permission.", variant: "danger" });
+      console.error("Failed to save permissions", error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  /* ── Count permissions per role ── */
   const getPermCount = (roleId: number) => {
     return perms.filter((p) => p.role_id === roleId).length;
   };
 
-  /* ── Table columns: show roles ── */
   const columns = useMemo<ColumnDef<Role, any>[]>(
     () => [
       {
@@ -253,22 +277,27 @@ export default function RolePermissionsPage() {
       {
         id: "actions",
         header: "Aksi",
-        cell: ({ row }) => (
-          <button
-            onClick={() => openPermissions(row.original)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors border border-blue-200"
-            title="Atur Permission"
-          >
-            <Shield className="size-3.5" />
-            Permission
-          </button>
-        ),
+        cell: ({ row }) => {
+          if (!permissions.can_update) return <span className="text-muted-foreground text-xs">-</span>;
+          return (
+            <button
+              onClick={() => openPermissions(row.original)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors border border-blue-200"
+              title="Atur Permission"
+            >
+              <Shield className="size-3.5" />
+              Permission
+            </button>
+          );
+        },
         enableSorting: false,
         size: 140,
       },
     ],
-    [perms]
+    [perms, permissions]
   );
+
+  const isDataLoading = loadingRoles || loadingMenus || loadingPerms;
 
   return (
     <div className="space-y-6">
@@ -284,18 +313,19 @@ export default function RolePermissionsPage() {
         </CardHeader>
         <CardContent className="p-0">
           <DataTable
-            data={DUMMY_ROLES}
+            data={roles}
             columns={columns}
             searchPlaceholder="Cari role..."
             exportFilename="role-permissions"
+            isLoading={isDataLoading}
+            canExport={permissions.can_report}
           />
         </CardContent>
       </Card>
 
-      {/* ── Permission Modal ── */}
       <Modal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => !isSaving && setModalOpen(false)}
         className="max-w-4xl max-h-[85vh] flex flex-col"
       >
         <ModalHeader>
@@ -316,24 +346,25 @@ export default function RolePermissionsPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setAll(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors border border-green-200"
+              disabled={isSaving}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50 transition-colors border border-green-200"
             >
               <CheckCheck className="size-3.5" />
               CENTANG SEMUA
             </button>
             <button
               onClick={() => setAll(false)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors border border-border"
+              disabled={isSaving}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-50 transition-colors border border-border"
             >
               <XCircle className="size-3.5" />
               HAPUS SEMUA
             </button>
-            <ModalClose onClose={() => setModalOpen(false)} />
+            <ModalClose onClose={() => !isSaving && setModalOpen(false)} />
           </div>
         </ModalHeader>
 
         <ModalBody className="p-0 overflow-y-auto">
-          {/* Permission Table */}
           <table className="w-full">
             <thead className="bg-card border-b border-border sticky top-0 z-10">
               <tr>
@@ -353,7 +384,6 @@ export default function RolePermissionsPage() {
             <tbody>
               {menuGroups.map((group, gi) => (
                 <Fragment key={`group-${gi}`}>
-                  {/* Parent / Group header row — only for actual parent groups */}
                   {group.parent && (
                     <tr key={`g-${gi}`} className="bg-muted/50">
                       <td colSpan={6} className="px-5 py-2.5">
@@ -367,7 +397,6 @@ export default function RolePermissionsPage() {
                     </tr>
                   )}
 
-                  {/* Child menus with checkboxes (only if path is not null) */}
                   {group.children.map((menu) => (
                     <tr
                       key={menu.id}
@@ -391,6 +420,7 @@ export default function RolePermissionsPage() {
                       {PERM_KEYS.map((key) => (
                         <td key={key} className="px-3 py-3 text-center">
                           <PermCheck
+                            disabled={isSaving}
                             checked={permState[menu.id]?.[key] ?? false}
                             onChange={() => togglePerm(menu.id, key)}
                           />
@@ -405,12 +435,21 @@ export default function RolePermissionsPage() {
         </ModalBody>
 
         <ModalFooter>
-          <Button variant="outline" onClick={() => setModalOpen(false)}>
+          <Button variant="outline" onClick={() => setModalOpen(false)} disabled={isSaving}>
             Batal
           </Button>
-          <Button onClick={handleSave}>
-            <Check className="size-4 mr-1.5" />
-            Simpan Perubahan
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? (
+              <>
+                <span className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-1.5" />
+                Menyimpan...
+              </>
+            ) : (
+              <>
+                <Check className="size-4 mr-1.5" />
+                Simpan Perubahan
+              </>
+            )}
           </Button>
         </ModalFooter>
       </Modal>

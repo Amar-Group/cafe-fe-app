@@ -65,6 +65,10 @@ interface DataTableProps<TData> {
   excludeFromToggle?: string[];
   /** Filename for CSV export (without extension) */
   exportFilename?: string;
+  /** Whether the data is currently loading */
+  isLoading?: boolean;
+  /** Whether the export button is visible (defaults to true) */
+  canExport?: boolean;
 }
 
 export function DataTable<TData>({
@@ -73,6 +77,8 @@ export function DataTable<TData>({
   searchPlaceholder = "Cari...",
   excludeFromToggle = ["actions"],
   exportFilename = "export",
+  isLoading = false,
+  canExport = true,
 }: DataTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -179,12 +185,14 @@ export function DataTable<TData>({
           </div>
 
           {/* Export */}
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
-          >
-            <Download className="size-4" /> Export
-          </button>
+          {canExport && (
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
+            >
+              <Download className="size-4" /> Export
+            </button>
+          )}
         </div>
       </div>
 
@@ -215,7 +223,16 @@ export function DataTable<TData>({
             ))}
           </thead>
           <tbody className="divide-y divide-border">
-            {table.getRowModel().rows.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={columns.length} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <span className="size-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                    <span>Memuat data...</span>
+                  </div>
+                </td>
+              </tr>
+            ) : table.getRowModel().rows.length === 0 ? (
               <tr>
                 <td
                   colSpan={columns.length}

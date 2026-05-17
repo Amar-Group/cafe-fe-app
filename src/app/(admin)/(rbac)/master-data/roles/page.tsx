@@ -18,14 +18,27 @@ import {
 
 import { DataTable } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
-import { DUMMY_ROLES } from "@/features/rbac/role/constants/dummy-data";
+import { useNotification } from "@/components/ui/notification";
 import type { Role } from "@/features/rbac/role/types";
+import {
+  useRoles,
+  useCreateRole,
+  useUpdateRole,
+  useDeleteRole,
+} from "@/features/rbac/role/hooks/use-role";
+import { usePermissions } from "@/features/rbac/user/hooks/use-user";
 
 const inputCls =
   "w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-card";
 
 export default function RolesPage() {
-  const [roles, setRoles] = useState<Role[]>(DUMMY_ROLES);
+  const { data: roles = [], isLoading } = useRoles();
+  const { add } = useNotification();
+  const createRole = useCreateRole();
+  const updateRole = useUpdateRole();
+  const deleteRole = useDeleteRole();
+  const permissions = usePermissions();
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -48,32 +61,37 @@ export default function RolesPage() {
     setModalOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formCode.trim() || !formName.trim()) return;
-    if (editingRole) {
-      setRoles((prev) =>
-        prev.map((r) =>
-          r.id === editingRole.id
-            ? { ...r, code: formCode, name: formName, updated_at: new Date().toISOString() }
-            : r
-        )
-      );
-    } else {
-      const newRole: Role = {
-        id: Math.max(...roles.map((r) => r.id), 0) + 1,
-        code: formCode.toUpperCase(),
-        name: formName,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setRoles((prev) => [...prev, newRole]);
+    
+    try {
+      if (editingRole) {
+        await updateRole.mutateAsync({
+          id: editingRole.id,
+          data: { code: formCode, name: formName },
+        });
+        add({ title: "Berhasil", message: "Role berhasil diperbarui.", variant: "success" });
+      } else {
+        await createRole.mutateAsync({
+          code: formCode.toUpperCase(),
+          name: formName,
+        });
+        add({ title: "Berhasil", message: "Role berhasil ditambahkan.", variant: "success" });
+      }
+      setModalOpen(false);
+    } catch (error: any) {
+      add({ title: "Gagal", message: error.message || "Terjadi kesalahan sistem.", variant: "danger" });
     }
-    setModalOpen(false);
   };
 
-  const handleDelete = (id: number) => {
-    setRoles((prev) => prev.filter((r) => r.id !== id));
-    setDeleteConfirmId(null);
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteRole.mutateAsync(id);
+      add({ title: "Berhasil", message: "Role berhasil dihapus.", variant: "success" });
+      setDeleteConfirmId(null);
+    } catch (error: any) {
+      add({ title: "Gagal", message: error.message || "Gagal menghapus role.", variant: "danger" });
+    }
   };
 
   const columns = useMemo<ColumnDef<Role, any>[]>(
@@ -83,8 +101,12 @@ export default function RolesPage() {
         header: "No",
         cell: ({ row, table }) => {
           const { pageIndex, pageSize } = table.getState().pagination;
-          const idx = table.getRowModel().rows.findIndex(r => r.id === row.id);
-          return <span className="text-muted-foreground text-sm">{pageIndex * pageSize + idx + 1}</span>;
+          const idx = table.getRowModel().rows.findIndex((r) => r.id === row.id);
+          return (
+            <span className="text-muted-foreground text-sm">
+              {pageIndex * pageSize + idx + 1}
+            </span>
+          );
         },
         size: 50,
         enableSorting: false,
@@ -103,7 +125,9 @@ export default function RolesPage() {
         accessorKey: "name",
         header: "Nama Role",
         cell: (info) => (
-          <span className="font-medium text-foreground">{info.getValue() as string}</span>
+          <span className="font-medium text-foreground">
+            {info.getValue() as string}
+          </span>
         ),
         size: 200,
       },
@@ -124,30 +148,39 @@ export default function RolesPage() {
       {
         id: "actions",
         header: "Aksi",
-        cell: ({ row }) => (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => openEdit(row.original)}
-              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              title="Edit"
-            >
-              <Edit className="size-3.5" />
-            </button>
-            <button
-              onClick={() => setDeleteConfirmId(row.original.id)}
-              className="p-1.5 rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
-              title="Hapus"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          </div>
-        ),
+        cell: ({ row }) => {
+          if (!permissions.can_update && !permissions.can_delete) return <span className="text-muted-foreground text-xs">-</span>;
+          return (
+            <div className="flex items-center gap-1">
+              {permissions.can_update && (
+                <button
+                  onClick={() => openEdit(row.original)}
+                  className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  title="Edit"
+                >
+                  <Edit className="size-3.5" />
+                </button>
+              )}
+              {permissions.can_delete && (
+                <button
+                  onClick={() => setDeleteConfirmId(row.original.id)}
+                  className="p-1.5 rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
+                  title="Hapus"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              )}
+            </div>
+          );
+        },
         enableSorting: false,
         size: 90,
       },
     ],
-    []
+    [permissions]
   );
+
+  const isSaving = createRole.isPending || updateRole.isPending;
 
   return (
     <div className="space-y-6">
@@ -163,16 +196,21 @@ export default function RolesPage() {
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle>Daftar Role</CardTitle>
-          <Button onClick={openCreate} size="sm">
-            <Plus className="size-4 mr-1.5" />
-            Tambah Role
-          </Button>
+          {permissions.can_create && (
+            <Button onClick={openCreate} size="sm" disabled={permissions.isLoading}>
+              <Plus className="size-4 mr-1.5" />
+              Tambah Role
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           <DataTable
             data={roles}
             columns={columns}
             searchPlaceholder="Cari role..."
+            isLoading={isLoading}
+            canExport={permissions.can_report}
+            exportFilename="roles"
           />
         </CardContent>
       </Card>
@@ -180,12 +218,12 @@ export default function RolesPage() {
       {/* Create/Edit Modal */}
       <Modal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => !isSaving && setModalOpen(false)}
         className="max-w-md"
       >
         <ModalHeader>
           <ModalTitle>{editingRole ? "Edit Role" : "Tambah Role"}</ModalTitle>
-          <ModalClose onClose={() => setModalOpen(false)} />
+          <ModalClose onClose={() => !isSaving && setModalOpen(false)} />
         </ModalHeader>
         <ModalBody className="space-y-4">
           <div className="space-y-1.5">
@@ -198,6 +236,7 @@ export default function RolesPage() {
               onChange={(e) => setFormCode(e.target.value.toUpperCase())}
               placeholder="Contoh: ADMIN"
               className={inputCls}
+              disabled={isSaving}
             />
             <p className="text-xs text-muted-foreground">
               Kode unik untuk identifikasi role (uppercase).
@@ -213,15 +252,19 @@ export default function RolesPage() {
               onChange={(e) => setFormName(e.target.value)}
               placeholder="Contoh: Administrator"
               className={inputCls}
+              disabled={isSaving}
             />
           </div>
         </ModalBody>
         <ModalFooter>
-          <Button variant="outline" onClick={() => setModalOpen(false)}>
+          <Button variant="outline" onClick={() => setModalOpen(false)} disabled={isSaving}>
             Batal
           </Button>
-          <Button onClick={handleSave} disabled={!formCode.trim() || !formName.trim()}>
-            {editingRole ? "Simpan Perubahan" : "Tambah"}
+          <Button
+            onClick={handleSave}
+            disabled={!formCode.trim() || !formName.trim() || isSaving}
+          >
+            {isSaving ? "Menyimpan..." : editingRole ? "Simpan Perubahan" : "Tambah"}
           </Button>
         </ModalFooter>
       </Modal>
@@ -229,12 +272,12 @@ export default function RolesPage() {
       {/* Delete Confirmation Modal */}
       <Modal
         open={deleteConfirmId !== null}
-        onClose={() => setDeleteConfirmId(null)}
+        onClose={() => !deleteRole.isPending && setDeleteConfirmId(null)}
         className="max-w-sm"
       >
         <ModalHeader>
           <ModalTitle>Konfirmasi Hapus</ModalTitle>
-          <ModalClose onClose={() => setDeleteConfirmId(null)} />
+          <ModalClose onClose={() => !deleteRole.isPending && setDeleteConfirmId(null)} />
         </ModalHeader>
         <ModalBody>
           <p className="text-sm text-muted-foreground">
@@ -243,15 +286,16 @@ export default function RolesPage() {
           </p>
         </ModalBody>
         <ModalFooter>
-          <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>
+          <Button variant="outline" onClick={() => setDeleteConfirmId(null)} disabled={deleteRole.isPending}>
             Batal
           </Button>
           <Button
             variant="destructive"
             onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+            disabled={deleteRole.isPending}
           >
             <Trash2 className="size-3.5 mr-1.5" />
-            Hapus
+            {deleteRole.isPending ? "Menghapus..." : "Hapus"}
           </Button>
         </ModalFooter>
       </Modal>

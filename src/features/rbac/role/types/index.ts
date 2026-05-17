@@ -5,3 +5,13 @@ export type Role = {
   created_at: string;
   updated_at: string;
 };
+
+export type CreateRoleRequest = {
+  code: string;
+  name: string;
+};
+
+export type UpdateRoleRequest = {
+  code?: string;
+  name?: string;
+};
