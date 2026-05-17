@@ -20,7 +20,12 @@ import {
   Hexagon,
   FileKey,
   ChevronDown,
-  Calendar
+  Calendar,
+  Database,
+  Settings,
+  Users,
+  Shield,
+  Menu as MenuIcon,
 } from "lucide-react";
 
 import { useStore } from "@/stores/use-store";
@@ -28,6 +33,20 @@ import { useStore } from "@/stores/use-store";
 const overviewLinks = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Calendar", href: "/calendar", icon: Calendar },
+  {
+    name: "Master Data", icon: Database,
+    subItems: [
+      { name: "Role", href: "/master-data/roles" },
+      { name: "User", href: "/master-data/users" },
+    ]
+  },
+  {
+    name: "Web Management", icon: Settings,
+    subItems: [
+      { name: "Menu", href: "/web-management/menus" },
+      { name: "Role Permission", href: "/web-management/role-permissions" },
+    ]
+  },
   {
     name: "Pages", icon: FileText,
     subItems: [
