@@ -6,8 +6,8 @@ import { useEffect, useRef } from "react";
  * Hook to reveal elements when they enter the viewport.
  * Adds the "revealed" class to elements with cafe-reveal* classes.
  */
-export function useScrollReveal() {
-  const containerRef = useRef<HTMLDivElement>(null);
+export function useScrollReveal(deps: any[] = []) {
+  const containerRef = useRef<any>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -35,7 +35,7 @@ export function useScrollReveal() {
     targets.forEach((el) => observer.observe(el));
 
     return () => observer.disconnect();
-  }, []);
+  }, deps);
 
   return containerRef;
 }

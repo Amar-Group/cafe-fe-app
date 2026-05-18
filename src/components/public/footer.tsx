@@ -13,19 +13,19 @@ import {
 
 const FOOTER_LINKS = {
   Menu: [
-    { label: "Coffee & Drinks", href: "#menu" },
-    { label: "Main Course", href: "#menu" },
-    { label: "Desserts & Pastry", href: "#menu" },
-    { label: "Signature Collection", href: "#featured" },
+    { label: "Coffee & Drinks", href: "/menu" },
+    { label: "Main Course", href: "/menu" },
+    { label: "Desserts & Pastry", href: "/menu" },
+    { label: "Signature Collection", href: "/" },
   ],
   Visit: [
-    { label: "Location & Hours", href: "#contact" },
-    { label: "Reserve a Table", href: "#reservation" },
-    { label: "Gallery", href: "#gallery" },
-    { label: "Events", href: "#events" },
+    { label: "Location & Hours", href: "/contact" },
+    { label: "Reserve a Table", href: "/reservation" },
+    { label: "Gallery", href: "/gallery" },
+    { label: "Events", href: "/events" },
   ],
   Connect: [
-    { label: "About Us", href: "#about" },
+    { label: "About Us", href: "/about" },
     { label: "Careers", href: "#" },
     { label: "Partnership", href: "#" },
     { label: "Press Kit", href: "#" },

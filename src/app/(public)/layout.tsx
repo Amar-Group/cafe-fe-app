@@ -20,13 +20,18 @@ export const metadata = {
     "Experience the perfect blend of premium coffee, artisan cuisine, and modern ambience. From signature drinks to gourmet meals, Savoria is your destination for unforgettable moments.",
 };
 
+import { CafeNavbar } from "@/components/public/navbar";
+import { CafeFooter } from "@/components/public/footer";
+
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <div
       className={`${cormorant.variable} ${manrope.variable} cafe-scroll cafe-scrollbar`}
       style={{ fontFamily: "var(--font-cafe-body), sans-serif" }}
     >
+      <CafeNavbar />
       {children}
+      <CafeFooter />
     </div>
   );
 }

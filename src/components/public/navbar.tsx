@@ -11,21 +11,26 @@ import {
   Clock,
   Camera,
 } from "lucide-react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 
 const NAV_LINKS = [
-  { label: "Home", href: "#hero" },
-  { label: "About", href: "#about" },
-  { label: "Menu", href: "#menu" },
-  { label: "Gallery", href: "#gallery" },
-  { label: "Events", href: "#events" },
-  { label: "Contact", href: "#contact" },
+  { label: "Home", href: "/" },
+  { label: "About", href: "/about" },
+  { label: "Menu", href: "/menu" },
+  { label: "Gallery", href: "/gallery" },
+  { label: "Events", href: "/events" },
+  { label: "Reservation", href: "/reservation" },
+  { label: "Contact", href: "/contact" },
 ];
 
 export function CafeNavbar() {
+  const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState("hero");
+  
+  // Use pathname for active tracking
+  const activeSection = pathname;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -35,35 +40,8 @@ export function CafeNavbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  /* Track active section based on scroll position */
-  useEffect(() => {
-    const sectionIds = NAV_LINKS.map((l) => l.href.slice(1));
-
-    const handleActiveSection = () => {
-      const scrollY = window.scrollY + 120; // offset for navbar height
-      let current = sectionIds[0];
-
-      for (const id of sectionIds) {
-        const el = document.getElementById(id);
-        if (el && el.offsetTop <= scrollY) {
-          current = id;
-        }
-      }
-
-      setActiveSection(current);
-    };
-
-    window.addEventListener("scroll", handleActiveSection, { passive: true });
-    handleActiveSection(); // run on mount
-    return () => window.removeEventListener("scroll", handleActiveSection);
-  }, []);
-
   const handleNavClick = (href: string) => {
     setMobileOpen(false);
-    const el = document.querySelector(href);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth" });
-    }
   };
 
   return (
@@ -121,7 +99,7 @@ export function CafeNavbar() {
           <Link
             href="/"
             className="flex items-center gap-2 group"
-            onClick={() => handleNavClick("#hero")}
+            onClick={() => handleNavClick("/")}
           >
             <div
               className={cn(
@@ -148,22 +126,23 @@ export function CafeNavbar() {
           {/* Desktop Nav Links */}
           <div className="hidden md:flex items-center gap-1">
             {NAV_LINKS.map((link) => (
-              <button
+              <Link
                 key={link.href}
+                href={link.href}
                 onClick={() => handleNavClick(link.href)}
                 className={cn(
                   "relative px-4 py-2 text-[13px] font-semibold tracking-wide uppercase transition-colors duration-300",
                   scrolled
-                    ? activeSection === link.href.slice(1)
+                    ? activeSection === link.href
                       ? "text-cafe-brown"
                       : "text-cafe-charcoal hover:text-cafe-brown"
-                    : activeSection === link.href.slice(1)
+                    : activeSection === link.href
                     ? "text-cafe-orange"
                     : "text-cafe-cream/80 hover:text-cafe-cream"
                 )}
               >
                 {link.label}
-                {activeSection === link.href.slice(1) && (
+                {activeSection === link.href && (
                   <span
                     className={cn(
                       "absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full transition-colors duration-300",
@@ -171,7 +150,7 @@ export function CafeNavbar() {
                     )}
                   />
                 )}
-              </button>
+              </Link>
             ))}
           </div>
 
@@ -227,18 +206,19 @@ export function CafeNavbar() {
         >
           <div className="p-6 pt-20 flex flex-col gap-2">
             {NAV_LINKS.map((link) => (
-              <button
+              <Link
                 key={link.href}
+                href={link.href}
                 onClick={() => handleNavClick(link.href)}
                 className={cn(
                   "text-left px-4 py-3 rounded-xl text-base font-medium tracking-wide transition-colors",
-                  activeSection === link.href.slice(1)
+                  activeSection === link.href
                     ? "bg-cafe-sand/60 text-cafe-brown"
                     : "text-cafe-charcoal/70 hover:bg-cafe-sand/30 hover:text-cafe-charcoal"
                 )}
               >
                 {link.label}
-              </button>
+              </Link>
             ))}
             <div className="mt-6 border-t border-cafe-sand pt-6">
               <button className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-cafe-charcoal text-cafe-cream text-sm font-semibold tracking-wide uppercase hover:bg-cafe-dark transition-colors">

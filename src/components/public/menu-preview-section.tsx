@@ -55,10 +55,10 @@ const MENU_ITEMS: MenuItem[] = [
 ];
 
 export function MenuPreviewSection() {
-  const ref = useScrollReveal();
   const [activeCategory, setActiveCategory] = useState<Category>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const ref = useScrollReveal([activeCategory, searchQuery, showAll]);
 
   const filteredItems = MENU_ITEMS.filter((item) => {
     const matchesCategory =
