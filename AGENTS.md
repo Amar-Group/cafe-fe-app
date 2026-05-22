@@ -160,8 +160,8 @@ export class MyEntityService {
 - Gunakan `WriteResult` untuk operasi create/update/delete
 - Untuk endpoint publik (tanpa JWT), tambahkan `skipAuth: true`
 - JANGAN buat instance dari service class
-- Jangan install library baru tanpa izin user
-- Jangan buat store Zustand baru kecuali benar-benar perlu state global
+- JANGAN install library baru tanpa izin user
+- JANGAN buat store Zustand baru kecuali benar-benar perlu state global
 
 ### 4.2 React Query Hook Pattern
 
