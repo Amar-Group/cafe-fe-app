@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
-function Modal({ open, onClose, className, children }) {
+function Modal({ open, onClose, className = undefined, children }) {
   const overlayRef = useRef(null);
 
   useEffect(() => {
@@ -46,7 +46,7 @@ function Modal({ open, onClose, className, children }) {
   );
 }
 
-function ModalHeader({ className, children }) {
+function ModalHeader({ className = undefined, children }) {
   return (
     <div
       data-slot="modal-header"
@@ -57,7 +57,7 @@ function ModalHeader({ className, children }) {
   );
 }
 
-function ModalTitle({ className, children }) {
+function ModalTitle({ className = undefined, children }) {
   return (
     <h2 data-slot="modal-title" className={cn("text-base font-semibold leading-tight", className)}>
       {children}
@@ -65,7 +65,7 @@ function ModalTitle({ className, children }) {
   );
 }
 
-function ModalBody({ className, children }) {
+function ModalBody({ className = undefined, children }) {
   return (
     <div data-slot="modal-body" className={cn("px-6 py-4 flex-1 overflow-y-auto", className)}>
       {children}
@@ -73,7 +73,7 @@ function ModalBody({ className, children }) {
   );
 }
 
-function ModalFooter({ className, children }) {
+function ModalFooter({ className = undefined, children }) {
   return (
     <div
       data-slot="modal-footer"
@@ -84,7 +84,7 @@ function ModalFooter({ className, children }) {
   );
 }
 
-function ModalClose({ onClose, className }) {
+function ModalClose({ onClose, className = undefined }) {
   return (
     <button
       data-slot="modal-close"
