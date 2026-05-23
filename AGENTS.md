@@ -246,8 +246,27 @@ Backend selalu mengembalikan format:
 
 ### 4.5 Page Pattern (Admin CRUD Pages)
 
-Setiap halaman admin CRUD mengikuti pattern:
+Setiap halaman admin CRUD WAJIB dipisah menjadi beberapa file modular untuk menghindari *monolithic components* dan memisahkan *concern*:
 
+```
+src/app/(admin)/(rbac)/master-data/entities/
+├── page.tsx                      # Orchestrator: Fetch data, render header, table & modals
+└── _components/                  # Komponen khusus halaman ini
+    ├── entity-columns.tsx        # Definisi kolom tabel (memanggil Zustand store untuk action)
+    └── entity-form-modal.tsx     # Form Create/Edit (memanggil Zustand store & mutations)
+```
+
+**Zustand CRUD Store Pattern:**
+Setiap fitur CRUD harus memiliki file `store.ts` di dalam `features/<domain>/store.ts` menggunakan factory `createCrudStore`:
+
+```typescript
+import { createCrudStore } from "@/stores/create-crud-store";
+import type { Entity } from "./types";
+
+export const useEntityStore = createCrudStore<Entity>();
+```
+
+**Struktur `page.tsx`:**
 ```tsx
 "use client";
 
@@ -255,38 +274,37 @@ import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter, ModalClose } from "@/components/ui/modal";
-import { useNotification } from "@/components/ui/notification";
+import { DeleteConfirmModal } from "@/components/shared/delete-confirm-modal";
 import { usePermissions } from "@/features/rbac/user/hooks/use-user";
+import { useEntityStore } from "@/features/rbac/entity/store";
+import { useEntityColumns } from "./_components/entity-columns";
+import { EntityFormModal } from "./_components/entity-form-modal";
 
 export default function EntityPage() {
   const { data, isLoading } = useEntities();
   const permissions = usePermissions();
-  const { add } = useNotification(); // toast notifications
-
-  // 1. PageHeader with breadcrumbs
-  // 2. Card wrapping DataTable
-  // 3. Create/Edit Modal
-  // 4. Delete Confirmation Modal
-  // 5. Permission-gated buttons
+  const { openCreate, deleteId, closeDelete } = useEntityStore();
+  const columns = useEntityColumns({ permissions });
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Judul Halaman"
-        description="Deskripsi halaman"
-        breadcrumbs={[{ label: "Parent", href: "#" }, { label: "Current" }]}
-      />
+      <PageHeader title="Judul" breadcrumbs={[{ label: "Parent", href: "#" }]} />
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle>Daftar Entity</CardTitle>
-          {permissions.can_create && <Button>Tambah</Button>}
+          {permissions.can_create && <Button onClick={openCreate}>Tambah</Button>}
         </CardHeader>
         <CardContent className="p-0">
           <DataTable data={data} columns={columns} isLoading={isLoading} />
         </CardContent>
       </Card>
-      {/* Modals */}
+      
+      <EntityFormModal />
+      <DeleteConfirmModal
+        open={deleteId !== null}
+        onOpenChange={(open) => !open && closeDelete()}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }
