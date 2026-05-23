@@ -185,6 +185,7 @@ export function AdminSidebar() {
           children: item.children ? filterItems(item.children) : [],
         }))
         .filter((item) => {
+          if (item.is_visible === false) return false;
           if (item.path) {
             return item.permissions?.can_read;
           }

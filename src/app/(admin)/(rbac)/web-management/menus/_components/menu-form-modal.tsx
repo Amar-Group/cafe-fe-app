@@ -35,6 +35,7 @@ export function MenuFormModal({ menus }: MenuFormModalProps) {
   const [formPath, setFormPath] = useState("");
   const [formPermissionPath, setFormPermissionPath] = useState("");
   const [formIcon, setFormIcon] = useState("");
+  const [formIsVisible, setFormIsVisible] = useState(false);
   const [formParentId, setFormParentId] = useState<number | "">("");
 
   const parentMenus = useMemo(
@@ -49,12 +50,14 @@ export function MenuFormModal({ menus }: MenuFormModalProps) {
         setFormPath(editingMenu.path || "");
         setFormPermissionPath(editingMenu.permission_path || "");
         setFormIcon(editingMenu.icon || "");
+        setFormIsVisible(editingMenu.is_visible ?? false);
         setFormParentId(editingMenu.parent_id ?? "");
       } else {
         setFormName("");
         setFormPath("");
         setFormPermissionPath("");
         setFormIcon("");
+        setFormIsVisible(false);
         setFormParentId("");
       }
     }
@@ -69,6 +72,7 @@ export function MenuFormModal({ menus }: MenuFormModalProps) {
       path: formPath || null,
       permission_path: formPermissionPath || null,
       icon: formIcon || null,
+      is_visible: formIsVisible,
       parent_id: parentId,
     };
 
@@ -200,6 +204,19 @@ export function MenuFormModal({ menus }: MenuFormModalProps) {
                 </option>
               ))}
           </select>
+        </div>
+        <div className="flex items-center gap-2 mt-4">
+          <input
+            type="checkbox"
+            id="is_visible"
+            checked={formIsVisible}
+            onChange={(e) => setFormIsVisible(e.target.checked)}
+            className="rounded border-border text-primary focus:ring-primary/20"
+            disabled={isSaving}
+          />
+          <label htmlFor="is_visible" className="text-sm font-medium text-foreground cursor-pointer">
+            Tampilkan di Sidebar (Menu Navigasi)
+          </label>
         </div>
       </ModalBody>
       <ModalFooter>
