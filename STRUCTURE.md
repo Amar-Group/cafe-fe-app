@@ -64,11 +64,7 @@ src/
 │   │   ├── (rbac)/             # ✅ RBAC permission check per route
 │   │   │   ├── layout.tsx      # RbacLayout: checks user navigation permissions
 │   │   │   ├── master-data/
-│   │   │   │   ├── roles/      # CRUD Roles
-│   │   │   │   │   ├── _components/
-│   │   │   │   │   │   ├── role-columns.tsx
-│   │   │   │   │   │   └── role-form-modal.tsx
-│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── roles/      # CRUD Roles page
 │   │   │   │   └── users/      # CRUD Users page
 │   │   │   └── web-management/
 │   │   │       ├── menus/      # CRUD Menu items page
@@ -168,7 +164,6 @@ src/
 │       │   │   └── use-user.ts      # useUsers, useUser, useCreateUser, useUpdateUser, useDeleteUser, useUserNavigation, usePermissions
 │       │   ├── constants/
 │       │   │   └── dummy-data.ts    # DUMMY_USERS (sample data)
-│       │   ├── store.ts             # Zustand store for user CRUD state
 │       │   └── utils/               # (kosong, disiapkan untuk helper functions)
 │       │
 │       ├── role/               # Role management
@@ -200,8 +195,7 @@ src/
 │
 ├── stores/                     # Zustand stores (global state)
 │   ├── use-auth.ts             # Auth state: token, user, isAuthenticated, setAuth, clearAuth, hydrate
-│   ├── use-store.ts            # UI state: isSidebarOpen, toggleSidebar, (demo: count)
-│   └── create-crud-store.ts    # Generic factory function for feature CRUD modal state
+│   └── use-store.ts            # UI state: isSidebarOpen, toggleSidebar, (demo: count)
 │
 ├── hooks/                      # Global reusable custom hooks (lintas feature)
 │   └── (kosong — disiapkan untuk hooks yang dipakai lebih dari satu feature)
@@ -265,15 +259,14 @@ usePermissions() → returns { can_read, can_create, can_update, can_delete, can
 
 ### 5. Admin Page Pattern (CRUD)
 
-Setiap halaman admin CRUD dipisah ke dalam beberapa komponen modular:
-1. `"use client"` directive di entry page (`page.tsx`)
-2. Menggunakan `createCrudStore<T>()` untuk global modal state (`openEdit`, `closeModal`, dll).
-3. `page.tsx`: Bertugas sebagai orchestrator (fetch data via React Query, render header & table).
-4. `_components/*-columns.tsx`: Definisi kolom tabel, menggunakan Zustand store untuk trigger modal edit/delete tanpa prop drilling.
-5. `_components/*-form-modal.tsx`: Modal form, membaca `editingItem` dari store dan menembak mutasi.
-6. `DeleteConfirmModal` dari shared components, dikontrol via store `deleteId`.
-7. Permission-gated actions diatur otomatis via `usePermissions()`.
-8. Toast notifications menempel di mutation success/error via `useNotification().add()`.
+Setiap halaman admin CRUD mengikuti pola yang konsisten:
+1. `"use client"` directive
+2. `PageHeader` dengan breadcrumbs
+3. `Card` > `CardHeader` (title + create button) > `CardContent` > `DataTable`
+4. Create/Edit `Modal` dengan form fields
+5. Delete confirmation `Modal`
+6. Permission-gated actions via `usePermissions()`
+7. Toast notifications via `useNotification().add()`
 
 ### 6. Provider Stack (Root → Leaf)
 
