@@ -142,7 +142,7 @@ src/
 │   │   └── page-header.tsx     # PageHeader with breadcrumbs
 │   │
 │   ├── layout/                 # Layout components
-│   │   ├── admin-sidebar.tsx   # Admin sidebar (dynamic menu from API + static demo links)
+│   │   ├── admin-sidebar.tsx   # Admin sidebar (dynamic menu from API, filters by is_visible)
 │   │   └── admin-header.tsx    # Admin header (search, theme toggle, user dropdown, logout)
 │   │
 │   ├── auth/                   # Auth-related components
@@ -269,10 +269,10 @@ Setiap halaman admin CRUD dipisah ke dalam beberapa komponen modular:
 1. `"use client"` directive di entry page (`page.tsx`)
 2. Menggunakan `createCrudStore<T>()` untuk global modal state (`openEdit`, `closeModal`, dll).
 3. `page.tsx`: Bertugas sebagai orchestrator (fetch data via React Query, render header & table).
-4. `_components/*-columns.tsx`: Definisi kolom tabel, menggunakan Zustand store untuk trigger modal edit/delete tanpa prop drilling.
-5. `_components/*-form-modal.tsx`: Modal form, membaca `editingItem` dari store dan menembak mutasi.
+4. `_components/*-columns.tsx`: Definisi kolom tabel, menggunakan Zustand store untuk trigger modal edit/delete tanpa prop drilling. Beberapa kolom memiliki custom actions (seperti Ikon Galeri Gambar yang memicu Modal khusus).
+5. `_components/*-form-modal.tsx`: Modal form, membaca `editingItem` dari store dan menembak mutasi. Dapat di-nest (seperti Modal Form di atas Modal Galeri).
 6. `DeleteConfirmModal` dari shared components, dikontrol via store `deleteId`.
-7. Permission-gated actions diatur otomatis via `usePermissions()`.
+7. Permission-gated actions diatur otomatis via `usePermissions()`. Khusus untuk menu tersembunyi (seperti `dish-images`), permission dibaca dari `permissions` prop di nested component yang bersumber langsung dari hooks tanpa harus ada route tersendiri.
 8. Toast notifications menempel di mutation success/error via `useNotification().add()`.
 
 ### 6. Provider Stack (Root → Leaf)

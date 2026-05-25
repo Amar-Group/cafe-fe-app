@@ -34,12 +34,17 @@ export function useDishOrderColumns({ onOpenDetails, permissions }: UseDishOrder
         accessorKey: "guest_name",
         header: "Nama Tamu",
         cell: (info) => (
-          <div className="flex flex-col">
-            <span className="font-medium text-foreground">{info.getValue() as string}</span>
-            <span className="text-xs text-muted-foreground">{info.row.original.guest_phone}</span>
-          </div>
+          <span className="font-medium text-foreground">{info.getValue() as string}</span>
         ),
         size: 200,
+      },
+      {
+        accessorKey: "guest_phone",
+        header: "No. HP",
+        cell: (info) => (
+          <span className="text-muted-foreground">{info.getValue() as string}</span>
+        ),
+        size: 150,
       },
       {
         accessorKey: "total",
