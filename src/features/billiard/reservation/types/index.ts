@@ -4,13 +4,17 @@ export type Reservation = {
   guest_name: string;
   guest_phone: string;
   date: string;
-  start_time: string;
-  end_time: string;
+  schedule_id: number;
   guest_count: number;
   notes: string | null;
   status: "pending" | "confirmed" | "preparing" | "completed" | "cancelled";
   created_at: string;
   updated_at: string;
+  schedule: {
+    id: number;
+    start_time: string;
+    end_time: string;
+  };
 };
 
 export type CreateReservationRequest = {
@@ -18,8 +22,7 @@ export type CreateReservationRequest = {
   guest_name: string;
   guest_phone: string;
   date: string;
-  start_time: string;
-  end_time: string;
+  schedule_id: number;
   guest_count: number;
   notes?: string | null;
   status?: "pending" | "confirmed" | "preparing" | "completed" | "cancelled";

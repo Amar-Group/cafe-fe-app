@@ -17,6 +17,7 @@ import {
 } from "@/features/billiard/reservation/hooks/use-reservation";
 import { useReservationStore } from "@/features/billiard/reservation/store";
 import { useBilliardTables } from "@/features/billiard/table/hooks/use-table";
+import { useSchedules } from "@/features/billiard/schedule/hooks/use-schedule";
 
 const inputCls =
   "w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-card";
@@ -28,13 +29,13 @@ export function ReservationFormModal() {
   const updateReservation = useUpdateReservation();
   
   const { data: tables = [] } = useBilliardTables();
+  const { data: schedules = [] } = useSchedules();
 
   const [formTableId, setFormTableId] = useState<number | "">("");
   const [formGuestName, setFormGuestName] = useState("");
   const [formGuestPhone, setFormGuestPhone] = useState("");
   const [formDate, setFormDate] = useState("");
-  const [formStartTime, setFormStartTime] = useState("");
-  const [formEndTime, setFormEndTime] = useState("");
+  const [formScheduleId, setFormScheduleId] = useState<number | "">("");
   const [formGuestCount, setFormGuestCount] = useState<number | "">("");
   const [formNotes, setFormNotes] = useState("");
   const [formStatus, setFormStatus] = useState<"pending" | "confirmed" | "preparing" | "completed" | "cancelled">("pending");
@@ -48,8 +49,7 @@ export function ReservationFormModal() {
         // Format date to YYYY-MM-DD
         const formattedDate = new Date(editingReservation.date).toISOString().split('T')[0];
         setFormDate(formattedDate);
-        setFormStartTime(editingReservation.start_time.substring(0, 5));
-        setFormEndTime(editingReservation.end_time.substring(0, 5));
+        setFormScheduleId(editingReservation.schedule_id);
         setFormGuestCount(editingReservation.guest_count);
         setFormNotes(editingReservation.notes || "");
         setFormStatus(editingReservation.status);
@@ -60,8 +60,7 @@ export function ReservationFormModal() {
         // Set default date to today
         const today = new Date().toISOString().split('T')[0];
         setFormDate(today);
-        setFormStartTime("10:00");
-        setFormEndTime("12:00");
+        setFormScheduleId("");
         setFormGuestCount(2);
         setFormNotes("");
         setFormStatus("pending");
@@ -70,7 +69,7 @@ export function ReservationFormModal() {
   }, [isModalOpen, editingReservation]);
 
   const handleSave = async () => {
-    if (formTableId === "" || !formGuestName.trim() || !formGuestPhone.trim() || !formDate || !formStartTime || !formEndTime || formGuestCount === "") return;
+    if (formTableId === "" || !formGuestName.trim() || !formGuestPhone.trim() || !formDate || formScheduleId === "" || formGuestCount === "") return;
 
     try {
       const payload = {
@@ -78,8 +77,7 @@ export function ReservationFormModal() {
         guest_name: formGuestName,
         guest_phone: formGuestPhone,
         date: formDate,
-        start_time: formStartTime,
-        end_time: formEndTime,
+        schedule_id: Number(formScheduleId),
         guest_count: Number(formGuestCount),
         notes: formNotes || null,
         status: formStatus,
@@ -177,7 +175,7 @@ export function ReservationFormModal() {
           </select>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-foreground">
               Tanggal <span className="text-red-500">*</span>
@@ -192,27 +190,21 @@ export function ReservationFormModal() {
           </div>
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-foreground">
-              Mulai <span className="text-red-500">*</span>
+              Jadwal Waktu <span className="text-red-500">*</span>
             </label>
-            <input
-              type="time"
-              value={formStartTime}
-              onChange={(e) => setFormStartTime(e.target.value)}
+            <select
+              value={formScheduleId}
+              onChange={(e) => setFormScheduleId(Number(e.target.value))}
               className={inputCls}
               disabled={isSaving}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-foreground">
-              Selesai <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="time"
-              value={formEndTime}
-              onChange={(e) => setFormEndTime(e.target.value)}
-              className={inputCls}
-              disabled={isSaving}
-            />
+            >
+              <option value="" disabled>Pilih jadwal</option>
+              {schedules.map((sched) => (
+                <option key={sched.id} value={sched.id}>
+                  {sched.start_time.substring(0, 5)} - {sched.end_time.substring(0, 5)}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -276,7 +268,7 @@ export function ReservationFormModal() {
         </Button>
         <Button
           onClick={handleSave}
-          disabled={formTableId === "" || !formGuestName.trim() || !formGuestPhone.trim() || !formDate || !formStartTime || !formEndTime || formGuestCount === "" || isSaving}
+          disabled={formTableId === "" || !formGuestName.trim() || !formGuestPhone.trim() || !formDate || formScheduleId === "" || formGuestCount === "" || isSaving}
         >
           {isSaving
             ? "Menyimpan..."

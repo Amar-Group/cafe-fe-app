@@ -84,11 +84,13 @@ export function useReservationColumns({ permissions }: UseReservationColumnsProp
         size: 120,
       },
       {
-        accessorKey: "start_time",
+        id: "time",
         header: "Waktu",
         cell: ({ row }) => {
-          const start = row.original.start_time;
-          const end = row.original.end_time;
+          const schedule = row.original.schedule;
+          if (!schedule) return <span>-</span>;
+          const start = schedule.start_time;
+          const end = schedule.end_time;
           return <span>{start.substring(0, 5)} - {end.substring(0, 5)}</span>;
         },
         size: 130,
