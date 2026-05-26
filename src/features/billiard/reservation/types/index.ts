@@ -8,12 +8,21 @@ export type Reservation = {
   guest_count: number;
   notes: string | null;
   status: "pending" | "confirmed" | "preparing" | "completed" | "cancelled";
+  payment_status?: string | null;
+  payment_method?: string | null;
   created_at: string;
   updated_at: string;
   schedule: {
     id: number;
     start_time: string;
     end_time: string;
+  };
+  billiard_table: {
+    id: number;
+    name: string;
+    slug: string;
+    price: string;
+    thumbnail: string | null;
   };
 };
 

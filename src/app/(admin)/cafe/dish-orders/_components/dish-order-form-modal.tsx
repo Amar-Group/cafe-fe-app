@@ -28,15 +28,18 @@ export function DishOrderFormModal() {
 
   const [formName, setFormName] = useState("");
   const [formPhone, setFormPhone] = useState("");
+  const [formStatus, setFormStatus] = useState<"pending" | "confirmed" | "preparing" | "completed" | "cancelled">("pending");
 
   useEffect(() => {
     if (isModalOpen) {
       if (editingOrder) {
         setFormName(editingOrder.guest_name);
         setFormPhone(editingOrder.guest_phone);
+        setFormStatus((editingOrder.status as any) || "pending");
       } else {
         setFormName("");
         setFormPhone("");
+        setFormStatus("pending");
       }
     }
   }, [isModalOpen, editingOrder]);
@@ -53,6 +56,7 @@ export function DishOrderFormModal() {
       tax: "0.00",
       service_fee: "0.00",
       nett_price: "0.00",
+      status: formStatus,
     };
 
     try {
@@ -63,6 +67,7 @@ export function DishOrderFormModal() {
           data: {
             guest_name: formName,
             guest_phone: formPhone,
+            status: formStatus,
           },
         });
         add({
@@ -124,6 +129,24 @@ export function DishOrderFormModal() {
             className={inputCls}
             disabled={isSaving}
           />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-foreground">
+            Status Pesanan
+          </label>
+          <select
+            value={formStatus}
+            onChange={(e) => setFormStatus(e.target.value as any)}
+            className={inputCls}
+            disabled={isSaving}
+          >
+            <option value="pending">Pending</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="preparing">Preparing</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
         </div>
 
         {!editingOrder && (

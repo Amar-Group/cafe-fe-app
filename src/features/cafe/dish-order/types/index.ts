@@ -6,6 +6,9 @@ export type DishOrder = {
   tax: string;
   service_fee: string;
   nett_price: string;
+  payment_status?: string | null;
+  payment_method?: string | null;
+  status: "pending" | "confirmed" | "preparing" | "completed" | "cancelled";
   created_at: string;
   updated_at: string;
 };
@@ -17,6 +20,7 @@ export type CreateDishOrderRequest = {
   tax: string;
   service_fee: string;
   nett_price: string;
+  status?: "pending" | "confirmed" | "preparing" | "completed" | "cancelled";
 };
 
 export type UpdateDishOrderRequest = Partial<CreateDishOrderRequest>;
@@ -27,7 +31,6 @@ export type DishOrderDetail = {
   dish_id: number;
   quantity: number;
   notes: string | null;
-  status: "pending" | "confirmed" | "preparing" | "completed" | "cancelled";
   created_at: string;
   updated_at: string;
 };
@@ -37,7 +40,6 @@ export type CreateDishOrderDetailRequest = {
   dish_id: number;
   quantity: number;
   notes?: string | null;
-  status?: "pending" | "confirmed" | "preparing" | "completed" | "cancelled";
 };
 
 export type UpdateDishOrderDetailRequest = Partial<CreateDishOrderDetailRequest>;

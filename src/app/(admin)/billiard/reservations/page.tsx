@@ -16,6 +16,7 @@ import { useReservationStore } from "@/features/billiard/reservation/store";
 
 import { useReservationColumns } from "./_components/reservation-columns";
 import { ReservationFormModal } from "./_components/reservation-form-modal";
+import { ReservationPaymentModal } from "./_components/reservation-payment-modal";
 import { DeleteConfirmModal } from "@/components/shared/delete-confirm-modal";
 
 export default function ReservationsPage() {
@@ -85,6 +86,7 @@ export default function ReservationsPage() {
       </Card>
 
       <ReservationFormModal />
+      <ReservationPaymentModal />
 
       <DeleteConfirmModal
         open={deleteId !== null}

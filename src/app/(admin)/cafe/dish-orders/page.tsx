@@ -17,6 +17,7 @@ import { useDishOrderColumns } from "./_components/dish-order-columns";
 import { DishOrderFormModal } from "./_components/dish-order-form-modal";
 import { DishOrderDetailModal } from "./_components/dish-order-detail-modal";
 import { DishOrderDetailFormModal } from "./_components/dish-order-detail-form-modal";
+import { DishOrderPaymentModal } from "./_components/dish-order-payment-modal";
 import { DeleteConfirmModal } from "@/components/shared/delete-confirm-modal";
 import type { DishOrder } from "@/features/cafe/dish-order/types";
 
@@ -130,6 +131,8 @@ export default function DishOrdersPage() {
       <DishOrderDetailFormModal
         dishOrderId={activeOrder?.id || null}
       />
+
+      <DishOrderPaymentModal />
 
       {/* Modal konfirmasi hapus untuk header (Dish Order) */}
       <DeleteConfirmModal

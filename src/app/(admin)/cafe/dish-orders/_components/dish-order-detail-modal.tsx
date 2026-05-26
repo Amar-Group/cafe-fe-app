@@ -41,6 +41,8 @@ export function DishOrderDetailModal({ isOpen, onClose, order, permissions }: Di
 
   if (!order) return null;
 
+  const isPaid = order.payment_status === "paid";
+
   return (
     <Modal open={isOpen} onClose={onClose} className="max-w-4xl z-[40]">
       <ModalHeader className="flex-row items-center justify-between pb-2 border-b border-border mb-4">
@@ -51,7 +53,7 @@ export function DishOrderDetailModal({ isOpen, onClose, order, permissions }: Di
       </ModalHeader>
       
       <ModalBody className="max-h-[75vh] overflow-y-auto no-scrollbar pb-6 space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg border border-border">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 bg-muted/30 rounded-lg border border-border">
           <div>
             <p className="text-xs text-muted-foreground">Subtotal</p>
             <p className="font-semibold">Rp {Number(order.total).toLocaleString("id-ID")}</p>
@@ -68,11 +70,22 @@ export function DishOrderDetailModal({ isOpen, onClose, order, permissions }: Di
             <p className="text-xs text-muted-foreground">Nett Price</p>
             <p className="font-bold text-primary text-lg">Rp {Number(order.nett_price).toLocaleString("id-ID")}</p>
           </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Status Pesanan</p>
+            <span className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-wider rounded-full ${
+              order.status === 'completed' ? 'bg-green-500/10 text-green-500' :
+              order.status === 'cancelled' ? 'bg-red-500/10 text-red-500' :
+              order.status === 'preparing' ? 'bg-blue-500/10 text-blue-500' :
+              'bg-yellow-500/10 text-yellow-600'
+            }`}>
+              {order.status || "pending"}
+            </span>
+          </div>
         </div>
 
         <div className="flex justify-between items-center">
           <h3 className="font-medium text-foreground">Daftar Item (Keranjang)</h3>
-          {permissions.can_create && (
+          {!isPaid && permissions.can_create && (
             <Button size="sm" onClick={() => openCreate()}>
               <Plus className="size-4 mr-1.5" />
               Tambah Item
@@ -83,7 +96,7 @@ export function DishOrderDetailModal({ isOpen, onClose, order, permissions }: Di
         {orderDetails.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-border rounded-lg bg-muted/20">
             <p className="text-muted-foreground mb-2">Belum ada item menu di pesanan ini.</p>
-            {permissions.can_create && (
+            {!isPaid && permissions.can_create && (
               <Button variant="outline" size="sm" onClick={() => openCreate()}>
                 Tambah Item Pertama
               </Button>
@@ -96,11 +109,10 @@ export function DishOrderDetailModal({ isOpen, onClose, order, permissions }: Di
                 <tr>
                   <th className="px-4 py-3 font-medium">Menu</th>
                   <th className="px-4 py-3 font-medium">Catatan</th>
-                  <th className="px-4 py-3 font-medium text-center">Status</th>
                   <th className="px-4 py-3 font-medium text-right">Harga</th>
                   <th className="px-4 py-3 font-medium text-center">Qty</th>
                   <th className="px-4 py-3 font-medium text-right">Total</th>
-                  <th className="px-4 py-3 font-medium text-center">Aksi</th>
+                  {!isPaid && <th className="px-4 py-3 font-medium text-center">Aksi</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -110,16 +122,6 @@ export function DishOrderDetailModal({ isOpen, onClose, order, permissions }: Di
                     <td className="px-4 py-3 text-muted-foreground max-w-[150px] truncate" title={item.notes || ""}>
                       {item.notes || "-"}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-wider rounded-full ${
-                        item.status === 'completed' ? 'bg-green-500/10 text-green-500' :
-                        item.status === 'cancelled' ? 'bg-red-500/10 text-red-500' :
-                        item.status === 'preparing' ? 'bg-blue-500/10 text-blue-500' :
-                        'bg-yellow-500/10 text-yellow-600'
-                      }`}>
-                        {item.status}
-                      </span>
-                    </td>
                     <td className="px-4 py-3 text-right text-muted-foreground">
                       {item.dish_price.toLocaleString("id-ID")}
                     </td>
@@ -127,28 +129,30 @@ export function DishOrderDetailModal({ isOpen, onClose, order, permissions }: Di
                     <td className="px-4 py-3 text-right font-medium">
                       {(item.dish_price * item.quantity).toLocaleString("id-ID")}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-1">
-                        {permissions.can_update && (
-                          <button
-                            onClick={() => openEdit(item)}
-                            className="p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                            title="Edit Item"
-                          >
-                            <Edit className="size-3.5" />
-                          </button>
-                        )}
-                        {permissions.can_delete && (
-                          <button
-                            onClick={() => openDelete(item.id)}
-                            className="p-1 rounded text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-colors"
-                            title="Hapus Item"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                    {!isPaid && (
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-1">
+                          {permissions.can_update && (
+                            <button
+                              onClick={() => openEdit(item)}
+                              className="p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                              title="Edit Item"
+                            >
+                              <Edit className="size-3.5" />
+                            </button>
+                          )}
+                          {permissions.can_delete && (
+                            <button
+                              onClick={() => openDelete(item.id)}
+                              className="p-1 rounded text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-colors"
+                              title="Hapus Item"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

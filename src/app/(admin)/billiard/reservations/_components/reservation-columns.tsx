@@ -2,10 +2,10 @@
 
 import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Reservation } from "@/features/billiard/reservation/types";
-import { useReservationStore } from "@/features/billiard/reservation/store";
+import { useReservationStore, useReservationPaymentStore } from "@/features/billiard/reservation/store";
 import { useBilliardTables } from "@/features/billiard/table/hooks/use-table";
 
 type UseReservationColumnsProps = {
@@ -17,6 +17,7 @@ type UseReservationColumnsProps = {
 
 export function useReservationColumns({ permissions }: UseReservationColumnsProps) {
   const { openEdit, openDelete } = useReservationStore();
+  const { openPaymentModal } = useReservationPaymentStore();
   const { data: tables = [] } = useBilliardTables();
 
   const tableMap = useMemo(() => {
@@ -136,11 +137,21 @@ export function useReservationColumns({ permissions }: UseReservationColumnsProp
         id: "actions",
         header: "Aksi",
         cell: ({ row }) => {
+          const isPaid = row.original.payment_status === "paid";
           if (!permissions.can_update && !permissions.can_delete)
             return <span className="text-muted-foreground text-xs">-</span>;
           return (
             <div className="flex items-center gap-1">
-              {permissions.can_update && (
+              {!isPaid && (
+                <button
+                  onClick={() => openPaymentModal(row.original)}
+                  className="p-1.5 rounded-md hover:bg-emerald-500/10 text-emerald-500 transition-colors"
+                  title="Bayar Reservasi"
+                >
+                  <Wallet className="size-4" />
+                </button>
+              )}
+              {permissions.can_update && !isPaid && (
                 <button
                   onClick={() => openEdit(row.original)}
                   className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
@@ -149,7 +160,7 @@ export function useReservationColumns({ permissions }: UseReservationColumnsProp
                   <Edit className="size-3.5" />
                 </button>
               )}
-              {permissions.can_delete && (
+              {permissions.can_delete && !isPaid && (
                 <button
                   onClick={() => openDelete(row.original.id)}
                   className="p-1.5 rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
@@ -165,6 +176,6 @@ export function useReservationColumns({ permissions }: UseReservationColumnsProp
         size: 100,
       },
     ],
-    [permissions, openEdit, openDelete, tableMap]
+    [permissions, openEdit, openDelete, openPaymentModal, tableMap]
   );
 }
