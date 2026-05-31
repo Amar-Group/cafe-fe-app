@@ -40,6 +40,7 @@ export type NavigationItem = {
   name: string;
   path: string | null;
   icon: string | null;
+  is_visible: boolean | null;
   parent_id: number | null;
   permissions: NavigationPermission;
   children: NavigationItem[];
