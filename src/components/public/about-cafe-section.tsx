@@ -27,7 +27,7 @@ const FEATURES = [
   },
 ];
 
-export function AboutSection() {
+export function AboutCafeSection() {
   const ref = useScrollReveal();
 
   return (
@@ -63,7 +63,7 @@ export function AboutSection() {
           <div className="relative cafe-reveal-left">
             <div className="relative aspect-[4/5] rounded-2xl overflow-hidden cafe-img-zoom">
               <Image
-                src="/images/cafe/interior.png"
+                src="/images/revisi/8.jpg"
                 alt="Savoria cafe interior with warm ambient lighting"
                 fill
                 className="object-cover"

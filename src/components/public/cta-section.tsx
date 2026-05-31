@@ -49,13 +49,14 @@ export function CtaSection() {
 
       {/* Marquee ticker */}
       <div className="mt-16 overflow-hidden">
-        <div className="animate-marquee whitespace-nowrap">
-          {Array.from({ length: 3 }).map((_, i) => (
+        {/* Tambahkan 'flex' dan 'w-max' di div ini */}
+        <div className="flex animate-marquee whitespace-nowrap w-max">
+          {Array.from({ length: 1 }).map((_, i) => (
             <span
               key={i}
               className="inline-block text-cafe-cream/[0.06] font-display text-[80px] md:text-[120px] font-bold uppercase tracking-wider mx-8"
             >
-              Savoria · Coffee · Cuisine · Lifestyle · Savoria · Coffee · Cuisine · Lifestyle ·{" "}
+              Savoria · Coffee · Cuisine · Lifestyle · Billiards · Savoria · Coffee · Cuisine · Lifestyle · Billiards{" "}
             </span>
           ))}
         </div>

@@ -2,7 +2,14 @@
 
 import { useScrollReveal } from "@/hooks/use-scroll-reveal";
 import { cn } from "@/lib/utils";
-import { Music, Calendar, Sparkles, Tag, ArrowRight } from "lucide-react";
+import { 
+  Music, 
+  Calendar, 
+  Sparkles, 
+  Tag, 
+  ArrowRight, 
+  Trophy, 
+  Target } from "lucide-react";
 
 const EVENTS = [
   {
@@ -16,6 +23,16 @@ const EVENTS = [
     accentBg: "bg-gradient-to-br from-cafe-olive/10 to-cafe-olive/5",
   },
   {
+    icon: Trophy,
+    title: "8-Ball Savoria Cup",
+    date: "End of Every Month",
+    time: "15:00 – Finish",
+    description: "Compete against the local finest players. Secure your bracket slot, aim true, and win the grand cash prize.",
+    tag: "Tournament",
+    tagColor: "bg-amber-600 text-white",
+    accentBg: "bg-gradient-to-br from-amber-600/10 to-amber-600/5",
+  },
+  {
     icon: Sparkles,
     title: "Seasonal Tasting Menu",
     date: "June 2024",
@@ -24,6 +41,16 @@ const EVENTS = [
     tag: "New",
     tagColor: "bg-cafe-orange text-white",
     accentBg: "bg-gradient-to-br from-cafe-orange/10 to-cafe-orange/5",
+  },
+  {
+    icon: Target,
+    title: "Billiard Coaching Clinic",
+    date: "Every Tuesday Night",
+    time: "18:00 – 20:00",
+    description: "Want to fix your stance or learn trick shots? Get free hands-on guidance from certified billiard coaches.",
+    tag: "Free Clinic",
+    tagColor: "bg-emerald-600 text-white",
+    accentBg: "bg-gradient-to-br from-emerald-600/10 to-emerald-600/5",
   },
   {
     icon: Tag,
@@ -74,7 +101,7 @@ export function EventsSection() {
           </h2>
           <p className="text-cafe-sand/50 text-base md:text-lg max-w-xl mx-auto font-light">
             There&apos;s always something special brewing. Join us for live
-            music, exclusive tastings, and irresistible deals.
+            music, billiard tournaments, and irresistible deals.
           </p>
         </div>
 

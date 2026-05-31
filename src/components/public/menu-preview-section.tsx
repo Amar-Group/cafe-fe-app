@@ -5,6 +5,8 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useScrollReveal } from "@/hooks/use-scroll-reveal";
 import { Flame, Leaf, Search, ArrowRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useStore } from "@/stores/use-store"; // <-- Import Zustand Store
 
 /* ── Menu Data ── */
 const CATEGORIES = [
@@ -55,6 +57,8 @@ const MENU_ITEMS: MenuItem[] = [
 ];
 
 export function MenuPreviewSection() {
+  const router = useRouter();
+  const addToCart = useStore((state) => state.addToCart); // <-- Selector-based access
   const [activeCategory, setActiveCategory] = useState<Category>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
@@ -200,7 +204,20 @@ export function MenuPreviewSection() {
                   <span className="font-display text-lg font-bold text-cafe-orange">
                     {item.price}
                   </span>
-                  <button className="w-8 h-8 rounded-full bg-cafe-charcoal text-cafe-cream flex items-center justify-center hover:bg-cafe-brown transition-colors duration-300 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all">
+                  
+                  {/* Tombol Tambah + Terintegrasi Global State */}
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      addToCart({
+                        name: item.name,
+                        price: item.price,
+                        category: item.category,
+                        image: item.image,
+                      });
+                    }}
+                    className="w-8 h-8 rounded-full bg-cafe-charcoal text-cafe-cream flex items-center justify-center hover:bg-cafe-brown duration-300 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all"
+                  >
                     <span className="text-lg leading-none">+</span>
                   </button>
                 </div>

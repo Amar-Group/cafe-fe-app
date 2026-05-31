@@ -4,42 +4,79 @@ import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ArrowRight } from "lucide-react";
+import Link from "next/link";
 
+// Menambahkan semua variasi gambar baru ke dalam array tanpa mengubah susunan lama
+// Posisi slide di-mix (selang-seling) antara tema Cafe dan Billiard
 const HERO_SLIDES = [
   {
-    image: "/images/cafe/hero.png",
-    subtitle: "Welcome to",
-    title: "Savoria",
-    tagline: "Where Every Flavor Tells a Story",
+    image: "/images/videos/kopi_putar.gif",
+    title: "Melody",
+    tagline: "Start your day with a perfect brew.",
   },
   {
-    image: "/images/cafe/food-spread.png",
-    subtitle: "Crafted with Love",
-    title: "Modern Cuisine",
-    tagline: "From Artisan Coffee to Gourmet Dining",
+    image: "/images/videos/hambur.gif", 
+    title: "Mastery",
+    tagline: "Where focus meets the perfect strike.",
   },
   {
-    image: "/images/cafe/interior.png",
-    subtitle: "Your Space to",
-    title: "Unwind",
-    tagline: "Work, Meet, Dine — All in One Place",
+    image: "/images/videos/kopi.gif",
+    title: "Warmth",
+    tagline: "A perfect cup for your perfect day.",
+  },
+  {
+    image: "/images/videos/bola_masuk.gif",
+    title: "Cozy",
+    tagline: "Your perfect space to relax and unwind.",
+  },
+  {
+    image: "/images/revisi/11.jpg",
+    title: "Harmony",
+    tagline: "Where nature and comfort blend.",
+  },
+  {
+    image: "/images/revisi/16.jpg",
+    title: "Precision",
+    tagline: "Focus, aim, and strike your best shot.",
+  },
+  {
+    image: "/images/revisi/7.jpg",
+    title: "Twilight",
+    tagline: "Sip under the gentle evening glow.",
+  },
+  {
+    image: "/images/revisi/18.jpg",
+    title: "Victory",
+    tagline: "Eat, sleep, pool, and repeat.",
+  },
+  {
+    image: "/images/revisi/7.jpg",
+    title: "Twilight",
+    tagline: "Sip under the gentle evening glow.",
   },
 ];
 
 export function HeroSection() {
   const [current, setCurrent] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false); // State untuk pause-on-hover
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Efek untuk auto-slide, bergantung pada state isHovered
   useEffect(() => {
     setLoaded(true);
-    intervalRef.current = setInterval(() => {
-      setCurrent((prev) => (prev + 1) % HERO_SLIDES.length);
-    }, 6000);
+    
+    // Jika tidak sedang di-hover, jalankan interval
+    if (!isHovered) {
+      intervalRef.current = setInterval(() => {
+        setCurrent((prev) => (prev + 1) % HERO_SLIDES.length);
+      }, 6000);
+    }
+
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, []);
+  }, [isHovered]); // Tambahkan isHovered sebagai dependency
 
   const slide = HERO_SLIDES[current];
 
@@ -47,27 +84,35 @@ export function HeroSection() {
     <section
       id="hero"
       className="relative w-full h-screen min-h-[600px] max-h-[1100px] overflow-hidden"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Background Images */}
-      {HERO_SLIDES.map((s, i) => (
-        <div
-          key={i}
-          className={cn(
-            "absolute inset-0 transition-opacity ease-in-out",
-            i === current ? "opacity-100" : "opacity-0"
-          )}
-          style={{ transitionDuration: "2000ms" }}
-        >
-          <Image
-            src={s.image}
-            alt={s.title}
-            fill
-            className="object-cover animate-ken-burns"
-            priority={i === 0}
-            sizes="100vw"
-          />
-        </div>
-      ))}
+      {/* Background GIF & Image Animations */}
+      {HERO_SLIDES.map((s, i) => {
+        // Cek apakah gambar adalah GIF agar optimasi bisa dimatikan secara kondisional
+        const isGif = s.image.toLowerCase().endsWith('.gif');
+        
+        return (
+          <div
+            key={i}
+            className={cn(
+              "absolute inset-0 transition-opacity ease-in-out",
+              i === current ? "opacity-100" : "opacity-0"
+            )}
+            style={{ transitionDuration: "2000ms" }}
+          >
+            <Image
+              src={s.image}
+              alt={s.title}
+              fill
+              className="object-cover animate-ken-burns"
+              priority={i === 0}
+              unoptimized={isGif} // Hanya matikan optimasi untuk format GIF
+              sizes="100vw"
+            />
+          </div>
+        );
+      })}
 
       {/* Gradient Overlay */}
       <div className="absolute inset-0 cafe-gradient-hero" />
@@ -77,26 +122,22 @@ export function HeroSection() {
 
       {/* Content */}
       <div className="relative z-10 h-full flex flex-col items-center justify-center px-4 text-center">
-        {/* Subtitle */}
+        
+        {/* JAM OPERASIONAL */}
         <p
           className={cn(
             "text-cafe-sand/80 text-sm md:text-base tracking-[0.35em] uppercase font-body font-medium mb-4 transition-all duration-1000 delay-200",
-            loaded
-              ? "opacity-100 translate-y-0"
-              : "opacity-0 translate-y-6"
+            loaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
           )}
-          key={`sub-${current}`}
         >
-          {slide.subtitle}
+          Mon–Sun: 08:00 – 23:00
         </p>
 
         {/* Title */}
         <h1
           className={cn(
             "font-display text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-light text-cafe-cream tracking-wide leading-none mb-6 transition-all duration-1000 delay-300",
-            loaded
-              ? "opacity-100 translate-y-0"
-              : "opacity-0 translate-y-8"
+            loaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           )}
           key={`title-${current}`}
         >
@@ -107,9 +148,7 @@ export function HeroSection() {
         <p
           className={cn(
             "text-cafe-sand/70 text-base md:text-lg lg:text-xl font-body font-light max-w-lg mb-10 transition-all duration-1000 delay-500",
-            loaded
-              ? "opacity-100 translate-y-0"
-              : "opacity-0 translate-y-6"
+            loaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
           )}
           key={`tag-${current}`}
         >
@@ -120,17 +159,10 @@ export function HeroSection() {
         <div
           className={cn(
             "flex flex-col sm:flex-row items-center gap-4 transition-all duration-1000 delay-700",
-            loaded
-              ? "opacity-100 translate-y-0"
-              : "opacity-0 translate-y-6"
+            loaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
           )}
         >
-          <button
-            onClick={() =>
-              document
-                .getElementById("menu")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }
+          <Link href='/menu'
             className="group flex items-center gap-3 px-8 py-3.5 bg-cafe-orange text-cafe-cream rounded-full text-sm font-semibold tracking-wider uppercase hover:bg-cafe-brown transition-all duration-300 hover:shadow-lg hover:shadow-cafe-orange/20"
           >
             Explore Menu
@@ -138,27 +170,24 @@ export function HeroSection() {
               size={16}
               className="group-hover:translate-x-1 transition-transform"
             />
-          </button>
-          <button
-            onClick={() =>
-              document
-                .getElementById("reservation")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }
+          </Link>
+          <Link href='/reservation'
             className="flex items-center gap-3 px-8 py-3.5 bg-transparent text-cafe-cream border border-cafe-cream/30 rounded-full text-sm font-semibold tracking-wider uppercase hover:bg-cafe-cream/10 hover:border-cafe-cream/50 transition-all duration-300"
           >
-            Reserve a Table
-          </button>
+            Book a Table
+          </Link>
         </div>
 
         {/* Slide Indicators */}
-        <div className="absolute bottom-28 sm:bottom-20 flex items-center gap-3">
+        <div className="absolute bottom-28 sm:bottom-20 flex items-center gap-3 max-w-full overflow-x-auto px-4 scrollbar-none">
           {HERO_SLIDES.map((_, i) => (
             <button
               key={i}
               onClick={() => setCurrent(i)}
+              aria-label={`Go to slide ${i + 1}`}
+              aria-current={i === current ? "true" : "false"}
               className={cn(
-                "h-1 rounded-full transition-all duration-500",
+                "h-1 rounded-full transition-all duration-500 flex-shrink-0",
                 i === current
                   ? "w-10 bg-cafe-orange"
                   : "w-4 bg-cafe-cream/30 hover:bg-cafe-cream/50"
