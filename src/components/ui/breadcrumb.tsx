@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { ChevronRight, Slash, ChevronLast, ArrowRight } from "lucide-react";
 
-function Breadcrumb({ className, children, separator = "chevron", ...props }) {
+function Breadcrumb({ className = undefined, children, separator = "chevron", ...props }) {
   const separators = {
     chevron: <ChevronRight className="size-3.5 text-muted-foreground shrink-0" />,
     slash:   <Slash className="size-3 text-muted-foreground shrink-0 rotate-[-20deg]" />,
@@ -32,7 +32,7 @@ function Breadcrumb({ className, children, separator = "chevron", ...props }) {
   );
 }
 
-function BreadcrumbItem({ href, active = false, children, className }) {
+function BreadcrumbItem({ href, active = false, children, className = undefined }) {
   if (active || !href) {
     return (
       <span
@@ -62,7 +62,7 @@ function BreadcrumbItem({ href, active = false, children, className }) {
   );
 }
 
-function BreadcrumbEllipsis({ className }) {
+function BreadcrumbEllipsis({ className = undefined }) {
   return (
     <span
       data-slot="breadcrumb-ellipsis"

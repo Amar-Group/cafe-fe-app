@@ -6,443 +6,509 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ---
 
-# Cafe Frontend App — Agent Context Guide
+# Cafe FE App — Agent Rules & Conventions
 
-> Dokumen ini adalah satu-satunya referensi bagi AI agent untuk memahami **arsitektur, konvensi, alur, dan aturan** proyek ini. Baca dokumen ini terlebih dahulu sebelum menulis kode apapun.
+> Baca file ini SEBELUM menulis kode apa pun di project ini.
+> File ini adalah sumber kebenaran untuk semua konvensi, arsitektur, dan pattern yang berlaku.
 
----
+## 1. Project Identity
 
-## 1. Identitas Proyek
+| Key              | Value                                            |
+| ---------------- | ------------------------------------------------ |
+| **Nama**         | Cafe FE App (Amar Cafe Frontend)                 |
+| **Stack**        | Next.js 16 (App Router) · React 19 · TypeScript 6 |
+| **Styling**      | Tailwind CSS v3 + CSS Variables (oklch) + shadcn/ui (base-nova style) |
+| **State**        | Zustand v5 (global) · TanStack React Query v5 (server state) |
+| **Forms**        | React Hook Form v7 + Zod v4 (validation)         |
+| **Tables**       | TanStack React Table v8                          |
+| **Icons**        | Lucide React                                     |
+| **Rich Text**    | TipTap v3                                        |
+| **Charts**       | ApexCharts (via react-apexcharts)                |
+| **Date Picker**  | react-datepicker                                 |
+| **File Upload**  | react-dropzone + Cloudinary (via custom hook)    |
+| **Select**       | react-select (untuk multi-select / searchable)   |
+| **Theme**        | next-themes (light/dark via class strategy)      |
+| **Package Mgr**  | Bun                                              |
+| **Backend API**  | REST API di `cafe-be-app` (default: http://localhost:4000) |
+| **Bahasa UI**    | **Bahasa Indonesia** untuk semua label, placeholder, notifikasi, dan pesan error |
 
-| Key | Value |
-|---|---|
-| **Nama** | `cafe-fe-app` |
-| **Jenis** | Aplikasi frontend untuk manajemen cafe |
-| **Framework** | Next.js 16 (App Router) |
-| **Bahasa** | TypeScript (strict: false) |
-| **Package Manager** | **Bun** (satu-satunya — jangan gunakan npm/yarn/pnpm) |
-| **Styling** | Tailwind CSS v3 + CSS Variables (oklch untuk admin, RGB channels untuk public) |
-| **UI Kit** | Shadcn/UI (style: `base-nova`, base color: `neutral`) |
-| **State Management** | Zustand |
-| **Data Fetching** | TanStack React Query |
-| **Form Handling** | React Hook Form + Zod |
-| **Charts** | ApexCharts (via `react-apexcharts`) |
-| **Rich Text** | Tiptap |
-| **Icons** | Lucide React |
-| **Theme** | `next-themes` (light default, dark mode via class strategy) |
-| **Animation** | Framer Motion + CSS scroll-reveal animations |
+## 2. Architecture Overview
 
----
+```
+Architecture: Feature-Sliced Design (Modular)
+Rendering: Client-side heavy (most pages use "use client")
+Auth: JWT token via localStorage + Zustand store
+RBAC: Backend-driven navigation & permission per route
+API Layer: Custom fetch wrapper (apiClient) → Service classes → React Query hooks
+Payment: Midtrans Snap integration (via backend snap_token)
+```
 
-## 2. Perintah Dasar
+### Provider Hierarchy (Root Layout)
+
+```
+<html> → <body>
+  └─ ThemeProvider (next-themes)
+     └─ NotificationProvider (custom toast system)
+        └─ QueryProvider (TanStack React Query, staleTime: 60s)
+           └─ {children}
+```
+
+### Route Group Strategy
+
+Project menggunakan Next.js **route groups** `(groupName)` untuk memisahkan layout:
+
+| Group          | Path Prefix   | Layout Behavior                              | Auth Required |
+| -------------- | ------------- | -------------------------------------------- | ------------- |
+| `(admin)`      | `/dashboard`, `/cafe/*`, `/billiard/*`, dll | Sidebar + Header + AuthGuard | ✅ Ya |
+| `(admin)/(rbac)` | `/master-data/*`, `/web-management/*`, `/transaction/*`, `/billiard/schedules` (rbac) | RBAC permission check per route | ✅ Ya |
+| `(admin)/cafe` | `/cafe/*` | Cafe pages (di luar RBAC group) | ✅ Ya |
+| `(admin)/billiard` | `/billiard/*` | Billiard pages (di luar RBAC group) | ✅ Ya |
+| `(auth)`       | `/auth/*`     | Minimal layout (bg #F8F9FD)                  | ❌ Tidak |
+| `(public)`     | `/`           | No layout wrapper                            | ❌ Tidak |
+| `(standalone)` | `/pages/maintenance`, `/pages/coming-soon` | Centered layout | ❌ Tidak |
+| `(error)`      | `/error/400`, `/error/401`, dst | Centered + text-center | ❌ Tidak |
+
+## 3. Directory & File Conventions
+
+### Path Alias
+
+```
+@/* → ./src/*   (dikonfigurasi di tsconfig.json)
+```
+
+### Feature Module Structure
+
+Setiap domain bisnis diorganisir sebagai feature module di `src/features/`:
+
+```
+src/features/<domain>/
+├── types/           # TypeScript types & interfaces (index.ts)
+├── services/        # Service class (static methods, uses apiClient)
+├── hooks/           # React Query hooks (useXxx, useCreateXxx, dst)
+├── constants/       # Konstanta & dummy data (opsional)
+├── utils/           # Helper functions khusus feature (opsional)
+├── store.ts         # Zustand CRUD store (createCrudStore atau custom) (opsional)
+└── components/      # (opsional) Komponen khusus feature
+```
+
+> **Catatan:** Minimum yang WAJIB ada di setiap feature module: `types/`, `services/`, `hooks/`.
+> Folder `constants/`, `utils/`, `store.ts` dibuat sesuai kebutuhan.
+> Jika feature membutuhkan CRUD modal state, buat `store.ts` menggunakan `createCrudStore<T>()`.
+
+### Global Hooks & Utils
+
+Selain hooks dan utils di dalam feature module, project juga memiliki folder global:
+
+```
+src/hooks/           # Global reusable custom hooks (lintas feature)
+src/utils/           # Global utility/helper functions (lintas feature)
+```
+
+**Aturan:**
+- Jika hook/util hanya relevan untuk satu feature → taruh di `features/<domain>/hooks/` atau `features/<domain>/utils/`
+- Jika hook/util dipakai oleh **lebih dari satu feature** → taruh di `src/hooks/` atau `src/utils/`
+
+**Feature modules yang sudah ada:**
+
+| Domain | Module | Deskripsi |
+|---|---|---|
+| **Auth** | `features/auth/` | Login service & auth types |
+| **RBAC** | `features/rbac/user/` | CRUD user, navigation, permissions |
+| **RBAC** | `features/rbac/role/` | CRUD role |
+| **RBAC** | `features/rbac/menu/` | CRUD menu (sidebar items) |
+| **RBAC** | `features/rbac/role-permission/` | CRUD role-permission mapping |
+| **Cafe** | `features/cafe/dish-category/` | CRUD kategori makanan |
+| **Cafe** | `features/cafe/dish/` | CRUD menu makanan |
+| **Cafe** | `features/cafe/dish-image/` | CRUD galeri gambar makanan |
+| **Cafe** | `features/cafe/dish-order/` | CRUD pesanan + detail + payment |
+| **Billiard** | `features/billiard/table-type/` | CRUD tipe meja billiard |
+| **Billiard** | `features/billiard/table/` | CRUD meja billiard |
+| **Billiard** | `features/billiard/table-image/` | CRUD galeri gambar meja |
+| **Billiard** | `features/billiard/schedule/` | CRUD slot waktu reservasi |
+| **Billiard** | `features/billiard/reservation/` | CRUD reservasi + payment |
+| **Payment** | `features/payment/` | Service untuk create/list payment |
+| **Upload** | `features/upload/` | Cloudinary upload hook |
+
+### Component Organization
+
+```
+src/components/
+├── ui/              # shadcn/ui components (DO NOT edit manually, use `npx shadcn add`)
+├── shared/          # Reusable business components (DataTable, PageHeader, DeleteConfirmModal)
+├── layout/          # Layout components (AdminSidebar, AdminHeader)
+├── auth/            # Auth-related components (AuthGuard)
+├── forms/           # (future) Reusable form components
+└── theme-provider.tsx
+```
+
+### Store Organization
+
+```
+src/stores/
+├── use-auth.ts          # Auth state (token, user, isAuthenticated, setAuth, clearAuth, hydrate)
+├── use-store.ts         # UI state (isSidebarOpen, toggleSidebar, dll)
+└── create-crud-store.ts # Generic factory for CRUD modal state management
+```
+
+**Feature stores** (di dalam masing-masing feature module):
+```
+src/features/cafe/dish-category/store.ts
+src/features/cafe/dish/store.ts
+src/features/cafe/dish-image/store.ts
+src/features/cafe/dish-order/store.ts       # Custom: detail modal + payment modal
+src/features/billiard/table-type/store.ts
+src/features/billiard/table/store.ts
+src/features/billiard/table-image/store.ts
+src/features/billiard/schedule/store.ts
+src/features/billiard/reservation/store.ts  # Custom: payment modal
+src/features/rbac/user/store.ts
+```
+
+## 4. Coding Patterns & Rules
+
+### 4.1 Service Class Pattern
+
+Setiap service WAJIB menggunakan pattern **static class** yang memanggil `apiClient`:
+
+```typescript
+// src/features/<domain>/services/<domain>-service.ts
+import { apiClient } from "@/services/api/client";
+import type { ApiResponse, WriteResult } from "@/services/api/types";
+import type { MyEntity, CreateRequest, UpdateRequest } from "../types";
+
+export class MyEntityService {
+  static async getAll(): Promise<ApiResponse<MyEntity[]>> {
+    return apiClient<ApiResponse<MyEntity[]>>("/api/my-entities");
+  }
+
+  static async create(payload: CreateRequest): Promise<ApiResponse<WriteResult>> {
+    return apiClient<ApiResponse<WriteResult>>("/api/my-entities", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+  // ... getById, update, delete
+}
+```
+
+**Rules:**
+- Semua method HARUS `static async`
+- Return type HARUS eksplisit `Promise<ApiResponse<T>>`
+- Gunakan `WriteResult` untuk operasi create/update/delete
+- Untuk endpoint publik (tanpa JWT), tambahkan `skipAuth: true`
+- JANGAN buat instance dari service class
+- JANGAN install library baru tanpa izin user
+- JANGAN buat store Zustand baru kecuali benar-benar perlu state global
+
+### 4.2 React Query Hook Pattern
+
+Setiap feature WAJIB memiliki hooks file yang membungkus service calls:
+
+```typescript
+// src/features/<domain>/hooks/use-<domain>.ts
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
+// Query Key Factory — WAJIB digunakan untuk konsistensi cache invalidation
+export const ENTITY_KEYS = {
+  all: ["entities"] as const,
+  lists: () => [...ENTITY_KEYS.all, "list"] as const,
+  list: (filters: string) => [...ENTITY_KEYS.lists(), { filters }] as const,
+  details: () => [...ENTITY_KEYS.all, "detail"] as const,
+  detail: (id: number) => [...ENTITY_KEYS.details(), id] as const,
+};
+
+// Query hook — untuk GET
+export function useEntities() {
+  return useQuery({
+    queryKey: ENTITY_KEYS.lists(),
+    queryFn: async () => {
+      const res = await EntityService.getAll();
+      return res.data; // ← unwrap ApiResponse.data
+    },
+  });
+}
+
+// Mutation hook — untuk POST/PUT/DELETE
+export function useCreateEntity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateRequest) => EntityService.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ENTITY_KEYS.lists() });
+    },
+  });
+}
+```
+
+**Rules:**
+- Selalu definisikan `ENTITY_KEYS` factory untuk query keys
+- Query hooks HARUS unwrap `res.data` dari `ApiResponse`
+- Mutation hooks HARUS invalidate queries terkait di `onSuccess`
+- Nama hook: `use<Entity>s` (list), `use<Entity>` (detail), `useCreate<Entity>`, `useUpdate<Entity>`, `useDelete<Entity>`
+
+### 4.3 API Response Contract
+
+Backend selalu mengembalikan format:
+
+```typescript
+// Success response
+{ success: true, data: T, message: "..." }
+
+// Error response (thrown by apiClient)
+{ success: false, message: "..." }
+
+// Write operations return
+{ success: true, data: { id: number | string }, message: "..." }
+
+// Payment create response (Midtrans)
+{ success: true, data: { id: number, snap_token: string, url: string, transaction_id: string }, message: "..." }
+```
+
+### 4.4 Auth & RBAC Pattern
+
+**Auth Flow:**
+1. Login → `AuthService.login()` → response berisi `{ token, user }`
+2. Token & user disimpan di `localStorage` + Zustand (`useAuthStore.setAuth()`)
+3. `apiClient` otomatis attach `Authorization: Bearer <token>` header
+4. Semua request juga attach `X-App-Token` header
+
+**RBAC Flow:**
+1. Setelah login, sidebar memanggil `useUserNavigation()` → `GET /api/users/me/navigation`
+2. Navigation response berisi tree of menu items dengan `permissions` per item
+3. `(rbac)` layout mengecek apakah current pathname ada di allowed paths
+4. `usePermissions()` hook memberikan `can_read/can_create/can_update/can_delete/can_report`
+5. UI buttons/actions dikontrol berdasarkan permissions
+
+**PENTING:**
+- JANGAN hardcode permission checks — selalu gunakan `usePermissions()`
+- Sidebar menu dirender dari API response, BUKAN dari static config
+- Static `overviewLinks` dan `componentLinks` di sidebar adalah untuk demo/showcase pages
+
+### 4.5 Page Pattern (Admin CRUD Pages)
+
+Setiap halaman admin CRUD WAJIB dipisah menjadi beberapa file modular untuk menghindari *monolithic components* dan memisahkan *concern*:
+
+```
+src/app/(admin)/cafe/entities/
+├── page.tsx                      # Orchestrator: Fetch data, render header, table & modals
+└── _components/                  # Komponen khusus halaman ini
+    ├── entity-columns.tsx        # Definisi kolom tabel (memanggil Zustand store untuk action)
+    ├── entity-form-modal.tsx     # Form Create/Edit (memanggil Zustand store & mutations)
+    ├── entity-image-gallery-modal.tsx  # (opsional) Galeri gambar
+    ├── entity-image-form-modal.tsx     # (opsional) Form upload gambar
+    └── entity-payment-modal.tsx        # (opsional) Modal payment (untuk orders/reservations)
+```
+
+**Zustand CRUD Store Pattern:**
+Setiap fitur CRUD harus memiliki file `store.ts` di dalam `features/<domain>/store.ts` menggunakan factory `createCrudStore`:
+
+```typescript
+import { createCrudStore } from "@/stores/create-crud-store";
+import type { Entity } from "./types";
+
+export const useEntityStore = createCrudStore<Entity>();
+```
+
+**Custom Store (untuk nested modals):**
+```typescript
+// Contoh: dish-order store dengan detail + payment modal
+import { createCrudStore } from "@/stores/create-crud-store";
+import type { DishOrder } from "./types";
+import { create } from "zustand";
+
+export const useDishOrderStore = createCrudStore<DishOrder>();
+
+// Tambahan state untuk detail/payment modals
+export const useDishOrderDetailStore = create<{
+  viewingOrder: DishOrder | null;
+  paymentOrder: DishOrder | null;
+  openDetail: (order: DishOrder) => void;
+  closeDetail: () => void;
+  openPayment: (order: DishOrder) => void;
+  closePayment: () => void;
+}>((set) => ({
+  viewingOrder: null,
+  paymentOrder: null,
+  openDetail: (order) => set({ viewingOrder: order }),
+  closeDetail: () => set({ viewingOrder: null }),
+  openPayment: (order) => set({ paymentOrder: order }),
+  closePayment: () => set({ paymentOrder: null }),
+}));
+```
+
+**Struktur `page.tsx`:**
+```tsx
+"use client";
+
+import { PageHeader } from "@/components/shared/page-header";
+import { DataTable } from "@/components/shared/data-table";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { DeleteConfirmModal } from "@/components/shared/delete-confirm-modal";
+import { usePermissions } from "@/features/rbac/user/hooks/use-user";
+import { useEntityStore } from "@/features/rbac/entity/store";
+import { useEntityColumns } from "./_components/entity-columns";
+import { EntityFormModal } from "./_components/entity-form-modal";
+
+export default function EntityPage() {
+  const { data, isLoading } = useEntities();
+  const permissions = usePermissions();
+  const { openCreate, deleteId, closeDelete } = useEntityStore();
+  const columns = useEntityColumns({ permissions });
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Judul" breadcrumbs={[{ label: "Parent", href: "#" }]} />
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle>Daftar Entity</CardTitle>
+          {permissions.can_create && <Button onClick={openCreate}>Tambah</Button>}
+        </CardHeader>
+        <CardContent className="p-0">
+          <DataTable data={data} columns={columns} isLoading={isLoading} />
+        </CardContent>
+      </Card>
+      
+      <EntityFormModal />
+      <DeleteConfirmModal
+        open={deleteId !== null}
+        onOpenChange={(open) => !open && closeDelete()}
+        onConfirm={handleDelete}
+      />
+    </div>
+  );
+}
+```
+
+### 4.6 Payment Integration Pattern
+
+Untuk halaman yang memiliki fitur pembayaran (dish-orders, reservations):
+
+```tsx
+// _components/entity-payment-modal.tsx
+import { PaymentService } from "@/features/payment/services/payment-service";
+
+// Cash payment → langsung complete
+const handleCashPayment = async () => {
+  await PaymentService.create({
+    type: "dish_order", // atau "reservation"
+    dish_order_id: order.id,
+    method: "cash",
+    provider: "cashier",
+    gross_amount: order.nett_price,
+  });
+};
+
+// Midtrans payment → get snap_token → open Snap widget
+const handleMidtransPayment = async () => {
+  const result = await PaymentService.create({
+    type: "dish_order",
+    dish_order_id: order.id,
+    method: "qris",
+    provider: "midtrans",
+    gross_amount: order.nett_price,
+  });
+  if (result.data?.snap_token) {
+    window.snap.pay(result.data.snap_token, { /* callbacks */ });
+  }
+};
+```
+
+### 4.7 UI Component Rules
+
+- **shadcn/ui components** di `src/components/ui/` — JANGAN edit manual, gunakan `npx shadcn add <component>`
+- shadcn style: **base-nova**, base color: **neutral**, CSS variables: **enabled**
+- `cn()` helper dari `@/lib/utils` untuk merging Tailwind classes
+- Icons: selalu gunakan **Lucide React** (`lucide-react`)
+- Notifications/Toast: gunakan `useNotification()` hook dari `@/components/ui/notification`
+  - Variants: `"success"`, `"danger"`, `"warning"`, `"info"`
+  - Format: `add({ title: "...", message: "...", variant: "success" })`
+
+### 4.8 Styling Rules
+
+- **Tailwind CSS v3** dengan PostCSS + Autoprefixer
+- Dark mode: `class` strategy (dikontrol oleh next-themes)
+- Color tokens menggunakan **oklch** CSS variables (lihat `globals.css`)
+- Selalu gunakan design tokens: `bg-background`, `text-foreground`, `bg-card`, `border-border`, dll
+- JANGAN hardcode warna kecuali untuk branding tertentu (misal: `bg-blue-600` untuk brand accent)
+- Border radius: gunakan `rounded-lg` / `rounded-xl` (sesuai `--radius` token)
+- Scrollbar hide: gunakan class `no-scrollbar`
+
+### 4.9 TypeScript Rules
+
+- `strict: false` di tsconfig (project ini tidak strict mode)
+- Semua types HARUS didefinisikan di `types/index.ts` dalam feature folder
+- Gunakan `type` keyword (bukan `interface`) untuk consistency
+- Path alias `@/*` WAJIB digunakan untuk semua imports (jangan relative `../../`)
+- Global shared types di `src/services/api/types.ts`: `ApiResponse<T>`, `WriteResult`
+
+### 4.10 Naming Conventions
+
+| Item              | Convention                    | Example                      |
+| ----------------- | ----------------------------- | ---------------------------- |
+| Feature folder    | kebab-case                    | `role-permission/`           |
+| Service file      | kebab-case + `-service.ts`    | `user-service.ts`            |
+| Hook file         | kebab-case + `use-` prefix    | `use-user.ts`                |
+| Service class     | PascalCase + `Service`        | `UserService`                |
+| Hook function     | camelCase + `use` prefix      | `useUsers`, `useCreateUser`  |
+| Query key factory | SCREAMING_SNAKE + `_KEYS`     | `USER_KEYS`                  |
+| Type              | PascalCase                    | `CreateUserRequest`          |
+| Component         | PascalCase                    | `PageHeader`, `DataTable`    |
+| Route page        | `page.tsx` (Next.js convention)| -                           |
+| Layout            | `layout.tsx`                  | -                            |
+| Store (global)    | `use-<name>.ts`               | `use-auth.ts`, `use-store.ts`|
+| Store (feature)   | `store.ts`                    | `features/cafe/dish/store.ts`|
+| Constants         | SCREAMING_SNAKE_CASE          | `DUMMY_USERS`, `API_BASE_URL`|
+
+## 5. Environment Variables
 
 ```bash
-bun install        # Install dependencies
-bun dev            # Jalankan dev server
-bun run build      # Build production
-bun run lint       # Jalankan ESLint
+NEXT_PUBLIC_API_URL=http://localhost:4000     # Base URL backend API
+NEXT_PUBLIC_APP_TOKEN=<token>                 # X-App-Token header value
 ```
 
-> ⚠️ **JANGAN** gunakan `npm`, `yarn`, atau `pnpm`. Proyek ini hanya menggunakan **Bun**.
+- Semua env vars yang diakses di client HARUS prefix `NEXT_PUBLIC_`
+- Config terpusat di `src/services/api/config.ts`
 
----
+## 6. Checklist Sebelum Menulis Kode
 
-## 3. Arsitektur & Struktur Folder
+- [ ] Sudah baca `node_modules/next/dist/docs/` untuk Next.js 16 APIs?
+- [ ] Feature baru → buat folder di `src/features/<domain>/` dengan minimum **3 folder wajib** (types, services, hooks)?
+- [ ] Types sudah didefinisikan di `types/index.ts`?
+- [ ] Service class menggunakan `apiClient` dan pattern static methods?
+- [ ] Hooks menggunakan `useQuery`/`useMutation` dengan query key factory?
+- [ ] Page menggunakan `"use client"` directive?
+- [ ] Permission check via `usePermissions()` untuk RBAC pages?
+- [ ] Notification menggunakan `useNotification().add()`?
+- [ ] Labels dan pesan dalam **Bahasa Indonesia**?
+- [ ] Import menggunakan `@/` alias?
+- [ ] CRUD store menggunakan `createCrudStore<T>()` dari `@/stores/create-crud-store`?
+- [ ] Page components dipisah ke `_components/` (columns, form-modal, dll)?
 
-```
-src/
-├── app/                          # Next.js App Router (route groups)
-│   ├── layout.tsx                # Root layout (font, providers, theme)
-│   ├── globals.css               # Global CSS + Tailwind + CSS vars
-│   │
-│   ├── (public)/                 # 🌐 Halaman publik/customer-facing
-│   │   ├── layout.tsx            # Layout publik (Cormorant Garamond + Manrope)
-│   │   └── page.tsx              # Landing page (11 section cinematic)
-│   │
-│   ├── (admin)/                  # 🔒 Dashboard admin (sidebar + header)
-│   │   ├── layout.tsx            # Admin shell: sidebar + header + main
-│   │   ├── dashboard/            # Halaman dashboard utama
-│   │   ├── base-ui/             # Showcase komponen UI dasar (21 jenis)
-│   │   ├── extended-ui/         # Komponen lanjutan (drag-drop, ratings)
-│   │   ├── forms/               # Showcase form (9 jenis)
-│   │   ├── tables/              # Basic tables + DataTable
-│   │   ├── charts/              # 17 jenis chart (ApexCharts)
-│   │   ├── icons/               # Icon gallery (Lucide)
-│   │   ├── calendar/            # Kalender
-│   │   └── pages/               # Halaman tambahan (blank, pricing, timeline)
-│   │
-│   ├── (auth)/                   # 🔑 Halaman autentikasi (tanpa sidebar)
-│   │   ├── layout.tsx            # Layout minimal (bg: #F8F9FD)
-│   │   └── auth/
-│   │       ├── login/
-│   │       ├── register/
-│   │       ├── recover-password/
-│   │       ├── confirm-mail/
-│   │       └── login-pin/
-│   │
-│   ├── (error)/                  # ❌ Halaman error (centered layout)
-│   │   ├── layout.tsx            # Layout centered + bg: #F8F9FD
-│   │   └── error/
-│   │       ├── 400/ 401/ 403/ 404/ 500/ 503/
-│   │
-│   └── (standalone)/             # 📄 Halaman standalone (centered)
-│       ├── layout.tsx            # Layout centered + bg: #F8F9FD
-│       └── pages/
-│           ├── coming-soon/
-│           └── maintenance/
-│
-├── components/                   # Komponen reusable global
-│   ├── ui/                       # 23 komponen UI (shadcn/base-nova)
-│   ├── layout/                   # Admin shell components
-│   │   ├── admin-sidebar.tsx     # Sidebar navigasi + collapsible menu
-│   │   └── admin-header.tsx      # Header + search + theme toggle + profile
-│   ├── public/                   # 12 komponen landing page cafe
-│   │   ├── navbar.tsx            # Navbar (transparan → solid on scroll, active tracking)
-│   │   ├── hero-section.tsx      # Hero fullscreen (auto-rotate slides, Ken Burns)
-│   │   ├── about-section.tsx     # About + image collage + feature highlights
-│   │   ├── featured-menu-section.tsx  # 3 signature menu cards (dark bg)
-│   │   ├── menu-preview-section.tsx   # Interactive menu grid + filter + search
-│   │   ├── gallery-section.tsx   # Masonry gallery + lightbox
-│   │   ├── testimonials-section.tsx   # Review cards + social proof bar
-│   │   ├── events-section.tsx    # Events & promotions (dark bg)
-│   │   ├── reservation-section.tsx    # Table reservation form
-│   │   ├── cta-section.tsx       # CTA + marquee ticker
-│   │   ├── location-section.tsx  # Google Maps + contact info
-│   │   └── footer.tsx            # Footer (brand, links, social)
-│   ├── theme-provider.tsx        # Wrapper next-themes
-│   └── client-demo.tsx           # Demo komponen (Zustand + React Query)
-│
-├── providers/
-│   └── query-provider.tsx        # TanStack React Query provider (staleTime: 60s)
-│
-├── stores/
-│   └── use-store.ts              # Zustand global store (counter demo + sidebar toggle)
-│
-├── lib/
-│   └── utils.ts                  # `cn()` helper (clsx + tailwind-merge)
-│
-├── hooks/
-│   └── use-scroll-reveal.ts      # IntersectionObserver hook untuk scroll animations
-│
-├── features/                     # 🏗️ BELUM ADA — untuk fitur domain bisnis
-├── services/                     # 🏗️ BELUM ADA — untuk API layer global
-├── utils/                        # 🏗️ BELUM ADA — untuk utility global
-├── constants/                    # 🏗️ BELUM ADA — untuk konstanta global
-├── types/                        # 🏗️ BELUM ADA — untuk TypeScript types global
-└── styles/                       # 🏗️ BELUM ADA — untuk styling tambahan
-```
+## 7. File Reference Quick Links
 
----
-
-## 4. Route Groups & Layout Strategy
-
-Proyek ini menggunakan **Route Groups** (`(nama)`) agar halaman dengan layout berbeda tidak saling mempengaruhi:
-
-| Route Group | Layout | Kegunaan | Ciri Khas |
-|---|---|---|---|
-| `(public)` | Layout khusus (font Cormorant Garamond + Manrope, smooth scroll) | Landing page cafe (11 section) | Navbar, Hero, About, Menu, Gallery, Testimonials, Events, Reservation, CTA, Location, Footer |
-| `(admin)` | Sidebar + Header + Main | Dashboard & semua fitur admin | `AdminSidebar` + `AdminHeader` |
-| `(auth)` | Minimal (bg biru muda) | Login, register, dll | Tanpa navigasi |
-| `(error)` | Centered (bg biru muda) | Halaman error HTTP | Centered + flex |
-| `(standalone)` | Centered (bg biru muda) | Coming soon, maintenance | Centered + flex |
-
-### Root Layout (`src/app/layout.tsx`)
-- Load font **Geist** (sans + mono) dari Google Fonts
-- Wrap semua children dengan `ThemeProvider` → `QueryProvider`
-- Default theme: `light`
-
----
-
-## 5. Design System & Theming
-
-### A. Admin Design System (oklch)
-Semua warna admin didefinisikan di `globals.css` menggunakan format **oklch**:
-- Light mode: `:root { ... }`
-- Dark mode: `.dark { ... }`
-
-### Semantic Color Tokens (Admin)
-```
-background, foreground, card, popover, primary, secondary,
-destructive, muted, accent, border, input, ring,
-chart-1~5, sidebar-*
-```
-
-### B. Cafe Public Design System (RGB Channels)
-Warna untuk area publik (landing page) menggunakan format **RGB channels** agar mendukung Tailwind opacity modifier (`text-cafe-charcoal/70`):
-
-```css
-/* globals.css */
-:root {
-  --cafe-cream: 245 240 232;
-  --cafe-charcoal: 42 42 42;
-  --cafe-brown: 139 111 71;
-  /* ... dst */
-}
-```
-
-```js
-/* tailwind.config.js */
-cafe: {
-  cream: "rgb(var(--cafe-cream) / <alpha-value>)",
-  charcoal: "rgb(var(--cafe-charcoal) / <alpha-value>)",
-  // ... dst
-}
-```
-
-### Cafe Color Palette
-| Token | RGB | Hex Equiv. | Kegunaan |
-|---|---|---|---|
-| `cafe-cream` | 245 240 232 | `#F5F0E8` | Background utama light sections |
-| `cafe-warm-white` | 250 250 246 | `#FAFAF6` | Background sections lebih terang |
-| `cafe-charcoal` | 42 42 42 | `#2A2A2A` | Text utama, dark section bg |
-| `cafe-dark` | 26 26 26 | `#1A1A1A` | Darkest background |
-| `cafe-brown` | 139 111 71 | `#8B6F47` | Primary accent, headings |
-| `cafe-brown-light` | 184 149 106 | `#B8956A` | Secondary accent |
-| `cafe-orange` | 200 121 65 | `#C87941` | CTA, highlights, badges |
-| `cafe-olive` | 107 125 62 | `#6B7D3E` | Nature/success accent |
-| `cafe-sand` | 232 221 208 | `#E8DDD0` | Borders, muted bg |
-| `cafe-latte` | 212 197 178 | `#D4C5B2` | Dividers, subtle elements |
-
-### Cafe Typography
-| Font | Variabel | Kegunaan |
-|---|---|---|
-| **Cormorant Garamond** | `font-display` | Headings, section titles |
-| **Manrope** | `font-body` | Body text, UI elements |
-
-### Cafe Animations (CSS)
-- `cafe-reveal`, `cafe-reveal-left`, `cafe-reveal-right` — scroll-triggered reveal
-- `cafe-stagger` — staggered children animation delay
-- `cafe-noise` — noise texture overlay
-- `animate-kenburns` — Ken Burns zoom pada hero slides
-- `animate-float` — floating decorative elements
-- `animate-marquee` — horizontal text ticker
-
-> ⚠️ **PENTING**: Gunakan format RGB channels untuk warna cafe, BUKAN hex. Tailwind opacity modifier (`/70`, `/50`) hanya bekerja dengan format `rgb(var(...) / <alpha-value>)`.
-
-### Aturan Styling
-1. **Admin area** → gunakan semantic color (`bg-background`, `text-foreground`) — oklch
-2. **Public area** → gunakan cafe color tokens (`bg-cafe-cream`, `text-cafe-charcoal`) — RGB
-3. **Dark mode** di admin area otomatis via CSS variables
-4. **`cn()` helper** wajib digunakan untuk class conditional
-5. Komponen UI base dari **shadcn/ui** — cek `src/components/ui/` sebelum buat baru
-6. Opacity modifier: `text-cafe-charcoal/70` (✅) BUKAN `text-cafe-charcoal opacity-70` (❌)
-
----
-
-## 6. State Management Pattern
-
-### Zustand Store (`src/stores/use-store.ts`)
-- Global store untuk state yang perlu shared across components
-- Pattern: `useStore((state) => state.xxx)` — selector-based access
-- Contoh existing: `isSidebarOpen`, `toggleSidebar`
-
-### TanStack React Query (`src/providers/query-provider.tsx`)
-- Untuk semua server state / data fetching
-- Default `staleTime: 60 * 1000` (1 menit)
-- Provider sudah di-wrap di root layout
-
----
-
-## 7. Feature Module Pattern (Planned)
-
-Ketika membuat fitur domain bisnis baru, ikuti struktur ini di `src/features/`:
-
-```
-src/features/<nama-feature>/
-├── components/     # Komponen khusus feature ini
-├── hooks/          # Custom hooks feature ini
-├── services/       # API calls feature ini
-├── types/          # TypeScript types/interfaces
-├── constants/      # Konstanta khusus
-└── utils/          # Helper/utils khusus
-```
-
-> Pemisahan ini memastikan setiap domain bisnis terisolasi dan tidak mencemari namespace global.
-
----
-
-## 8. Navigasi Admin Sidebar
-
-Sidebar admin memiliki 2 section utama:
-
-### Overview
-- Dashboard (`/dashboard`)
-- Calendar (`/calendar`)
-- Pages (sub-menu: blank, pricing, timeline)
-- Auth Pages (sub-menu, external links)
-- Error Pages (sub-menu, external links)
-
-### Component
-- Base UI (22 sub-item)
-- Extended UI (2 sub-item)
-- Icons (`/icons`)
-- Charts (17 sub-item)
-- Forms (9 sub-item)
-- Tables (2 sub-item)
-
-### Sidebar Behavior
-- **Collapsible**: toggle via header button → state di Zustand (`isSidebarOpen`)
-- **Mobile**: overlay + backdrop, close on click outside
-- **Desktop collapsed**: width 72px, hanya tampil icon
-- **Desktop expanded**: width 260px, tampil icon + label
-- **Active state**: `bg-blue-50 text-blue-700` pada item aktif
-- **External links**: halaman auth/error/standalone dibuka di tab baru
-
----
-
-## 9. Konvensi Kode
-
-### Umum
-1. **File naming**: kebab-case untuk file/folder (`admin-header.tsx`, `use-store.ts`)
-2. **Component naming**: PascalCase (`AdminHeader`, `QueryProvider`)
-3. **Export**: Named export (bukan default) untuk komponen — kecuali page.tsx (default export)
-4. **"use client"**: Wajib ditambahkan pada komponen yang menggunakan hooks, events, atau browser API
-
-### Imports
-- Path alias: `@/*` → `./src/*`
-- Urutan: (1) external libs → (2) `@/` aliases → (3) relative imports
-- Komponen UI: `import { Button } from "@/components/ui/button"`
-
-### TypeScript
-- `strict: false` — tidak wajib typing ketat, tapi tetap direkomendasikan
-- `ignoreBuildErrors: true` di `next.config.mjs` — build tidak gagal karena TS error
-
----
-
-## 10. Dependency Penting
-
-| Package | Versi | Kegunaan |
-|---|---|---|
-| `next` | 16.2.6 | Framework utama |
-| `react` / `react-dom` | 19.2.4 | UI library |
-| `zustand` | ^5.0 | Client state management |
-| `@tanstack/react-query` | ^5.100 | Server state / data fetching |
-| `@tanstack/react-table` | ^8.21 | DataTable headless |
-| `react-hook-form` | ^7.75 | Form management |
-| `@hookform/resolvers` | ^5.2 | Resolver (Zod, dll) |
-| `zod` | ^4.4 | Schema validation |
-| `next-themes` | ^0.4 | Dark/light mode |
-| `lucide-react` | ^1.14 | Icon library |
-| `class-variance-authority` | ^0.7 | Variant-based styling |
-| `clsx` + `tailwind-merge` | latest | Class merging utility |
-| `apexcharts` + `react-apexcharts` | latest | Charts |
-| `@tiptap/*` | ^3.23 | Rich text editor |
-| `react-datepicker` | ^9.1 | Date picker |
-| `react-dropzone` | ^15.0 | File upload |
-| `react-select` | ^5.10 | Select dropdown advanced |
-| `shadcn` | ^4.7 | CLI untuk generate komponen |
-| `framer-motion` | ^12.38 | Animasi kompleks (future use) |
-
----
-
-## 11. Konfigurasi Penting
-
-### `next.config.mjs`
-```js
-typescript: { ignoreBuildErrors: true }
-```
-
-### `tsconfig.json`
-- `module`: esnext, `moduleResolution`: bundler
-- Path alias `@/*` → `./src/*`
-- JSX: `react-jsx`
-
-### `components.json` (Shadcn)
-- Style: `base-nova`
-- Base color: `neutral`
-- CSS Variables: `true`
-- Icon library: `lucide`
-- Aliases: `@/components`, `@/lib/utils`, `@/components/ui`, `@/lib`, `@/hooks`
-
-### `tailwind.config.js`
-- Content scan: `src/pages/`, `src/components/`, `src/app/`, `src/features/`
-- Dark mode: `class` strategy
-- Plugin: `tailwindcss-animate`
-
----
-
-## 12. Status Proyek
-
-### Sudah Selesai
-- ✅ Admin dashboard layout (sidebar + header)
-- ✅ Theme switching (light/dark)
-- ✅ Komponen UI showcase (base-ui, extended-ui, charts, forms, tables, icons)
-- ✅ Halaman auth (login, register, recover-password, confirm-mail, login-pin)
-- ✅ Halaman error (400, 401, 403, 404, 500, 503)
-- ✅ Halaman standalone (coming-soon, maintenance)
-- ✅ Demo Zustand + React Query
-- ✅ **Landing page cafe** (11 section, premium cinematic design)
-  - Navbar (transparan → solid, scroll-based active tracking)
-  - Hero (fullscreen, auto-rotating slides, Ken Burns effect)
-  - About (image collage, stats card, feature highlights)
-  - Featured Menu (3 signature cards, dark bg)
-  - Interactive Menu Grid (11 kategori, search, badges, filter)
-  - Gallery (masonry grid, lightbox prev/next)
-  - Testimonials (4 review cards, social proof bar)
-  - Events & Promotions (live acoustic, happy hour, dll)
-  - Reservation Form (date, time, guests, seating preference)
-  - CTA (dual buttons, marquee ticker)
-  - Location (Google Maps embed, contact info, WhatsApp CTA)
-  - Footer (brand, 3 kolom link, social icons)
-- ✅ Custom hooks (`use-scroll-reveal`)
-- ✅ Cafe design system (warm palette, premium fonts, scroll animations)
-- ✅ 6 editorial-quality image assets (`public/images/cafe/`)
-
-### Belum Ada (Perlu Dibangun)
-- ❌ Feature modules (`src/features/`)
-- ❌ API service layer (`src/services/`)
-- ❌ Global types (`src/types/`)
-- ❌ Authentication logic (login flow, token, guards)
-- ❌ CRUD fitur domain bisnis (menu cafe, orders, dll)
-- ❌ Online ordering system (cart via Zustand, checkout flow)
-- ❌ Reservation backend integration
-- ❌ Dedicated menu page (full catalog)
-- ❌ User authentication & profile
-
----
-
-## 13. Aturan untuk AI Agent
-
-1. **Selalu baca file ini** sebelum memulai pekerjaan apapun
-2. **Gunakan Bun** — jangan pernah suggest/jalankan npm/yarn/pnpm
-3. **Ikuti folder structure** di `STRUCTURE.md` dan section 3 dokumen ini
-4. **Gunakan semantic color tokens** — admin: `bg-background`, public: `bg-cafe-cream`
-5. **Cek komponen yang sudah ada** di `src/components/ui/` dan `src/components/public/` sebelum buat baru
-6. **Feature baru** → buat di `src/features/<nama>/` dengan sub-folder sesuai pattern
-7. **Jangan hapus komentar/docstring** yang sudah ada kecuali diminta
-8. **"use client"** wajib di komponen yang pakai hooks/events/browser API
-9. **Gunakan `cn()` helper** untuk class conditional, bukan string concatenation manual
-10. **Baca docs Next.js 16** di `node_modules/next/dist/docs/` bila ragu soal API
-11. **Cafe colors harus pakai format RGB channels** — bukan hex — agar Tailwind opacity modifier bekerja
-12. **Komponen publik** → taruh di `src/components/public/`, ikuti pattern scroll-reveal dan cafe design tokens
-13. **Scroll animations** → gunakan class `cafe-reveal` / `cafe-reveal-left` / `cafe-reveal-right` + hook `useScrollReveal`
-
----
-
-## 14. Public Landing Page — Referensi Cepat
-
-### Section Order (di `page.tsx`)
-```
-CafeNavbar → HeroSection → AboutSection → FeaturedMenuSection →
-MenuPreviewSection → GallerySection → TestimonialsSection →
-EventsSection → ReservationSection → CtaSection →
-LocationSection → CafeFooter
-```
-
-### Section IDs (untuk navigasi)
-| Komponen | Section ID | Nav Link |
-|---|---|---|
-| `HeroSection` | `#hero` | Home |
-| `AboutSection` | `#about` | About |
-| `MenuPreviewSection` | `#menu` | Menu |
-| `GallerySection` | `#gallery` | Gallery |
-| `EventsSection` | `#events` | Events |
-| `LocationSection` | `#contact` | Contact |
-
-### Image Assets (`public/images/cafe/`)
-- `hero.png` — Cafe atmosphere hero shot
-- `food-spread.png` — Flat-lay food photography
-- `signature-drink.png` — Iced latte close-up
-- `interior.png` — Warm interior shot
-- `dessert.png` — Dessert plating
-- `pasta.png` — Gourmet pasta dish
+| Concern              | File                                          |
+| -------------------- | --------------------------------------------- |
+| API Client           | `src/services/api/client.ts`                  |
+| API Config           | `src/services/api/config.ts`                  |
+| API Types            | `src/services/api/types.ts`                   |
+| Auth Store           | `src/stores/use-auth.ts`                      |
+| UI Store             | `src/stores/use-store.ts`                     |
+| CRUD Store Factory   | `src/stores/create-crud-store.ts`             |
+| Auth Guard           | `src/components/auth/auth-guard.tsx`          |
+| Theme Provider       | `src/components/theme-provider.tsx`           |
+| Query Provider       | `src/providers/query-provider.tsx`            |
+| Root Layout          | `src/app/layout.tsx`                          |
+| Admin Layout         | `src/app/(admin)/layout.tsx`                  |
+| RBAC Guard Layout    | `src/app/(admin)/(rbac)/layout.tsx`           |
+| Sidebar              | `src/components/layout/admin-sidebar.tsx`     |
+| Header               | `src/components/layout/admin-header.tsx`      |
+| DataTable            | `src/components/shared/data-table.tsx`        |
+| PageHeader           | `src/components/shared/page-header.tsx`       |
+| DeleteConfirmModal   | `src/components/shared/delete-confirm-modal.tsx` |
+| Cloudinary Upload    | `src/features/upload/hooks/use-cloudinary-upload.ts` |
+| Payment Service      | `src/features/payment/services/payment-service.ts` |
+| Global CSS           | `src/app/globals.css`                         |
+| Tailwind Config      | `tailwind.config.js`                          |
+| shadcn Config        | `components.json`                             |
+| Utils (cn)           | `src/lib/utils.ts`                            |

@@ -16,8 +16,10 @@ import {
   LogOut
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useStore } from "@/stores/use-store";
+import { useAuthStore } from "@/stores/use-auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,9 +31,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function AdminHeader() {
+  const router = useRouter();
   const toggleSidebar = useStore((state) => state.toggleSidebar);
+  const { user, clearAuth } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+
+  const handleLogout = () => {
+    clearAuth();
+    router.push("/auth/login");
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -101,19 +110,19 @@ export function AdminHeader() {
           <DropdownMenu>
             <DropdownMenuTrigger className="hidden sm:flex items-center gap-2 pl-2 pr-3 py-1 rounded-full hover:bg-muted outline-none transition-colors ml-2">
               <img
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex&backgroundColor=transparent"
-                alt="Musharof Chowdhury"
+                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || "User"}&backgroundColor=transparent`}
+                alt={user?.name || "User"}
                 className="size-7 rounded-full bg-muted"
               />
-              <span className="text-sm font-medium">Musharof Chowdhury</span>
+              <span className="text-sm font-medium">{user?.name || "User"}</span>
               <ChevronsUpDown className="size-3 text-muted-foreground ml-1" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 mt-2 rounded-xl p-2 border-none ring-0 outline-none shadow-lg">
               <DropdownMenuGroup>
                 <DropdownMenuLabel className="font-normal px-2 pt-1 pb-3">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-semibold leading-none text-foreground">Musharof Chowdhury</p>
-                    <p className="text-xs leading-none text-muted-foreground pt-1">randomuser@pimjo.com</p>
+                    <p className="text-sm font-semibold leading-none text-foreground">{user?.name || "User"}</p>
+                    <p className="text-xs leading-none text-muted-foreground pt-1">{user?.email || "-"}</p>
                   </div>
                 </DropdownMenuLabel>
               </DropdownMenuGroup>
@@ -130,7 +139,7 @@ export function AdminHeader() {
                 <span className="font-medium">Support</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-2" />
-              <DropdownMenuItem className="cursor-pointer gap-3 py-2 px-2 text-muted-foreground focus:text-foreground rounded-md">
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer gap-3 py-2 px-2 text-red-500 focus:text-red-600 focus:bg-red-50 rounded-md">
                 <LogOut className="size-[18px]" />
                 <span className="font-medium">Sign out</span>
               </DropdownMenuItem>

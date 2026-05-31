@@ -18,13 +18,16 @@ export const metadata = {
 
 import { QueryProvider } from "@/providers/query-provider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { NotificationProvider } from "@/components/ui/notification";
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <body>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          <QueryProvider>{children}</QueryProvider>
+          <NotificationProvider>
+            <QueryProvider>{children}</QueryProvider>
+          </NotificationProvider>
         </ThemeProvider>
       </body>
     </html>
