@@ -151,8 +151,12 @@ src/
 │   │       ├── confirm-mail/
 │   │       └── login-pin/
 │   │
-│   ├── (public)/               # ❌ No auth — Public pages
-│   │   └── page.tsx            # Homepage (currently: ClientDemo)
+│   ├── (public)/               # ❌ No auth — Public pages (Landing Page & Customer Facing)
+│   │   ├── _components/        # Shared components for public pages (Footer, Navbar, etc.)
+│   │   ├── menu/               # Halaman menu makanan statis & dinamis
+│   │   ├── order/              # Halaman checkout pesanan + Midtrans Snap integration
+│   │   ├── reservation/        # Halaman reservasi meja billiard + Midtrans Snap integration
+│   │   └── page.tsx            # Homepage (Landing Page Amar Cafe)
 │   │
 │   ├── (standalone)/           # ❌ No auth — Full-page standalone pages
 │   │   ├── layout.tsx          # Centered layout
@@ -339,7 +343,7 @@ src/
 │
 ├── stores/                     # Zustand stores (global state)
 │   ├── use-auth.ts             # Auth state: token, user, isAuthenticated, setAuth, clearAuth, hydrate
-│   ├── use-store.ts            # UI state: isSidebarOpen, toggleSidebar, (demo: count)
+│   ├── use-store.ts            # UI state: isSidebarOpen, toggleSidebar, cart management (addCart, removeCart, clearCart)
 │   └── create-crud-store.ts    # Generic factory function for feature CRUD modal state
 │
 ├── hooks/                      # Global reusable custom hooks (lintas feature)
@@ -423,13 +427,13 @@ Setiap halaman admin CRUD dipisah ke dalam beberapa komponen modular:
 ### 6. Payment Integration Pattern (Frontend)
 
 ```
-Order/Reservation Page
-  → Click "Bayar" → Opens Payment Modal
-  → Select method (cash/midtrans)
+Order/Reservation Page (Admin & Public)
+  → Click "Bayar" (atau "Selesaikan Pesanan")
+  → Tentukan metode pembayaran (cash/qris)
   → If cash: PaymentService.create() → auto-complete order
-  → If midtrans: PaymentService.create() → receive snap_token
+  → If qris (midtrans): PaymentService.create() → receive snap_token
     → window.snap.pay(snap_token) → Midtrans Snap popup
-    → On success: update payment status via webhook (backend)
+    → On success: otomatis dikonfirmasi, dan notifikasi struk WhatsApp (Fonnte) dikirim dari backend.
 ```
 
 ### 7. Provider Stack (Root → Leaf)

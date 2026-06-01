@@ -385,10 +385,10 @@ export default function EntityPage() {
 Untuk halaman yang memiliki fitur pembayaran (dish-orders, reservations):
 
 ```tsx
-// _components/entity-payment-modal.tsx
+// _components/entity-payment-modal.tsx atau order-section.tsx
 import { PaymentService } from "@/features/payment/services/payment-service";
 
-// Cash payment → langsung complete
+// Cash payment → langsung complete, struk WA otomatis dari backend
 const handleCashPayment = async () => {
   await PaymentService.create({
     type: "dish_order", // atau "reservation"
@@ -400,6 +400,7 @@ const handleCashPayment = async () => {
 };
 
 // Midtrans payment → get snap_token → open Snap widget
+// Setelah sukses, webhook backend akan memproses notifikasi WA via Fonnte
 const handleMidtransPayment = async () => {
   const result = await PaymentService.create({
     type: "dish_order",
