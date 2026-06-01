@@ -7,6 +7,7 @@ export const DISH_KEYS = {
   lists: () => [...DISH_KEYS.all, "list"] as const,
   details: () => [...DISH_KEYS.all, "detail"] as const,
   detail: (id: number) => [...DISH_KEYS.details(), id] as const,
+  public: () => [...DISH_KEYS.all, "public"] as const,
 };
 
 export function useDishes() {
@@ -14,6 +15,16 @@ export function useDishes() {
     queryKey: DISH_KEYS.lists(),
     queryFn: async () => {
       const res = await DishService.getAll();
+      return res.data;
+    },
+  });
+}
+
+export function usePublicDishes() {
+  return useQuery({
+    queryKey: DISH_KEYS.public(),
+    queryFn: async () => {
+      const res = await DishService.getPublic();
       return res.data;
     },
   });

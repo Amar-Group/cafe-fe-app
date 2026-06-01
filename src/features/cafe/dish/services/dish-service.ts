@@ -7,6 +7,12 @@ export class DishService {
     return apiClient<ApiResponse<Dish[]>>("/api/dishes");
   }
 
+  static async getPublic(): Promise<ApiResponse<Dish[]>> {
+    return apiClient<ApiResponse<Dish[]>>("/api/public/dishes", {
+      skipAuth: true,
+    });
+  }
+
   static async getById(id: number): Promise<ApiResponse<Dish>> {
     return apiClient<ApiResponse<Dish>>(`/api/dishes/${id}`);
   }

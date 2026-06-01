@@ -1,4 +1,4 @@
-import { UmkmSection } from "@/components/public/umkm-section";
+import { UmkmSection } from "./_components/umkm-section";
 
 export default function umkmPage() {
     return (

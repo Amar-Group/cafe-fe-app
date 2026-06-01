@@ -11,6 +11,11 @@ export type Dish = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  category?: {
+    id: number;
+    name: string;
+    icon: string | null;
+  };
 };
 
 export type CreateDishRequest = {
@@ -26,3 +31,16 @@ export type CreateDishRequest = {
 };
 
 export type UpdateDishRequest = Partial<CreateDishRequest>;
+
+export interface MenuPreviewItem {
+  dish_id: number;
+  name: string;
+  category: string;
+  price: string;
+  image: string;
+  description: string;
+  bestSeller?: boolean;
+  isNew?: boolean;
+  spicyLevel?: number;
+  vegetarian?: boolean;
+}

@@ -10,6 +10,7 @@ export const DISH_CATEGORY_KEYS = {
   lists: () => [...DISH_CATEGORY_KEYS.all, "list"] as const,
   details: () => [...DISH_CATEGORY_KEYS.all, "detail"] as const,
   detail: (id: number) => [...DISH_CATEGORY_KEYS.details(), id] as const,
+  public: () => [...DISH_CATEGORY_KEYS.all, "public"] as const,
 };
 
 export function useDishCategories() {
@@ -17,6 +18,16 @@ export function useDishCategories() {
     queryKey: DISH_CATEGORY_KEYS.lists(),
     queryFn: async () => {
       const res = await DishCategoryService.getAll();
+      return res.data;
+    },
+  });
+}
+
+export function usePublicDishCategories() {
+  return useQuery({
+    queryKey: DISH_CATEGORY_KEYS.public(),
+    queryFn: async () => {
+      const res = await DishCategoryService.getPublic();
       return res.data;
     },
   });

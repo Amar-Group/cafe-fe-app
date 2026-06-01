@@ -11,6 +11,12 @@ export class DishCategoryService {
     return apiClient<ApiResponse<DishCategory[]>>("/api/dish-categories");
   }
 
+  static async getPublic(): Promise<ApiResponse<DishCategory[]>> {
+    return apiClient<ApiResponse<DishCategory[]>>("/api/public/dish-categories", {
+      skipAuth: true,
+    });
+  }
+
   static async getById(id: number): Promise<ApiResponse<DishCategory>> {
     return apiClient<ApiResponse<DishCategory>>(`/api/dish-categories/${id}`);
   }

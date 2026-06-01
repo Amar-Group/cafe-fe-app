@@ -10,6 +10,11 @@ export type BilliardTable = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  type?: {
+    id: number;
+    name: string;
+    icon: string | null;
+  };
 };
 
 export type CreateBilliardTableRequest = {

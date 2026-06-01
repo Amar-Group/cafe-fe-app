@@ -37,7 +37,6 @@ export function DishOrderDetailFormModal({ dishOrderId }: DishOrderDetailFormMod
   const [formDishId, setFormDishId] = useState<number | "">("");
   const [formQty, setFormQty] = useState<number>(1);
   const [formNotes, setFormNotes] = useState("");
-  const [formStatus, setFormStatus] = useState<string>("pending");
 
   useEffect(() => {
     if (isModalOpen) {
@@ -45,12 +44,10 @@ export function DishOrderDetailFormModal({ dishOrderId }: DishOrderDetailFormMod
         setFormDishId(editingItem.dish_id);
         setFormQty(editingItem.quantity);
         setFormNotes(editingItem.notes || "");
-        setFormStatus(editingItem.status);
       } else {
         setFormDishId("");
         setFormQty(1);
         setFormNotes("");
-        setFormStatus("pending");
       }
     }
   }, [isModalOpen, editingItem]);
@@ -63,7 +60,6 @@ export function DishOrderDetailFormModal({ dishOrderId }: DishOrderDetailFormMod
       dish_id: Number(formDishId),
       quantity: formQty,
       notes: formNotes || null,
-      status: formStatus as any,
     };
 
     try {
@@ -124,37 +120,18 @@ export function DishOrderDetailFormModal({ dishOrderId }: DishOrderDetailFormMod
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-foreground">
-              Quantity <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={formQty}
-              onChange={(e) => setFormQty(Number(e.target.value))}
-              className={inputCls}
-              disabled={isSaving}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-foreground">
-              Status <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formStatus}
-              onChange={(e) => setFormStatus(e.target.value)}
-              className={inputCls}
-              disabled={isSaving}
-            >
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="preparing">Preparing</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-foreground">
+            Quantity <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="number"
+            min="1"
+            value={formQty}
+            onChange={(e) => setFormQty(Number(e.target.value))}
+            className={inputCls}
+            disabled={isSaving}
+          />
         </div>
 
         <div className="space-y-1.5">

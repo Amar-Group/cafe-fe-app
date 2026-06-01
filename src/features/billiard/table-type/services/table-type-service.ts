@@ -11,6 +11,10 @@ export class BilliardTableTypeService {
     return apiClient<ApiResponse<BilliardTableType[]>>("/api/billiard-table-types");
   }
 
+  static async getPublicAll(): Promise<ApiResponse<BilliardTableType[]>> {
+    return apiClient<ApiResponse<BilliardTableType[]>>("/api/public/billiard-table-types");
+  }
+
   static async getById(id: number): Promise<ApiResponse<BilliardTableType>> {
     return apiClient<ApiResponse<BilliardTableType>>(`/api/billiard-table-types/${id}`);
   }

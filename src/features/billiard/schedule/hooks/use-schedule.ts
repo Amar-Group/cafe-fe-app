@@ -20,6 +20,16 @@ export function useSchedules() {
   });
 }
 
+export function usePublicSchedules() {
+  return useQuery({
+    queryKey: [...SCHEDULE_KEYS.lists(), "public"],
+    queryFn: async () => {
+      const res = await ScheduleService.getPublicAll();
+      return res.data;
+    },
+  });
+}
+
 export function useSchedule(id: number) {
   return useQuery({
     queryKey: SCHEDULE_KEYS.detail(id),

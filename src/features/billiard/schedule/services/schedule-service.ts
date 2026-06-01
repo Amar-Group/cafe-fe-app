@@ -7,6 +7,10 @@ export class ScheduleService {
     return apiClient<ApiResponse<Schedule[]>>("/api/schedules");
   }
 
+  static async getPublicAll(): Promise<ApiResponse<Schedule[]>> {
+    return apiClient<ApiResponse<Schedule[]>>("/api/public/schedules");
+  }
+
   static async getById(id: number): Promise<ApiResponse<Schedule>> {
     return apiClient<ApiResponse<Schedule>>(`/api/schedules/${id}`);
   }

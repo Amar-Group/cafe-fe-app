@@ -20,8 +20,8 @@ export const metadata = {
     "Experience the perfect blend of premium coffee, artisan cuisine, and modern ambience. From signature drinks to gourmet meals, Savoria is your destination for unforgettable moments.",
 };
 
-import { CafeNavbar } from "@/components/public/navbar";
-import { CafeFooter } from "@/components/public/footer";
+import { CafeNavbar } from "@/components/layout/public-navbar";
+import { CafeFooter } from "@/components/layout/public-footer";
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
