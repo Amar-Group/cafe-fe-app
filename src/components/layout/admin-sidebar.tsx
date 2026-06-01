@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import React from "react";
 import {
   Box,
   LayoutDashboard,
@@ -20,14 +21,36 @@ import {
   Hexagon,
   FileKey,
   ChevronDown,
-  Calendar
+  Calendar,
+  Database,
+  Settings,
+  Users,
+  Shield,
+  Menu as MenuIcon,
+  Circle,
 } from "lucide-react";
+import * as LucideIcons from "lucide-react";
 
 import { useStore } from "@/stores/use-store";
+import { useUserNavigation } from "@/features/rbac/user/hooks/use-user";
 
 const overviewLinks = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Calendar", href: "/calendar", icon: Calendar },
+  {
+    name: "Master Data", icon: Database,
+    subItems: [
+      { name: "Role", href: "/master-data/roles" },
+      { name: "User", href: "/master-data/users" },
+    ]
+  },
+  {
+    name: "Web Management", icon: Settings,
+    subItems: [
+      { name: "Menu", href: "/web-management/menus" },
+      { name: "Role Permission", href: "/web-management/role-permissions" },
+    ]
+  },
   {
     name: "Pages", icon: FileText,
     subItems: [
@@ -151,7 +174,41 @@ export function AdminSidebar() {
   const pathname = usePathname();
   const isSidebarOpen = useStore((state) => state.isSidebarOpen);
   const toggleSidebar = useStore((state) => state.toggleSidebar);
-  const [expandedMenus, setExpandedMenus] = useState({});
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
+  const { data: navItems = [], isLoading: isLoadingNav } = useUserNavigation();
+
+  const filteredNavItems = React.useMemo(() => {
+    function filterItems(items: any[]) {
+      return items
+        .map((item) => ({
+          ...item,
+          children: item.children ? filterItems(item.children) : [],
+        }))
+        .filter((item) => {
+          if (item.is_visible === false) return false;
+          if (item.path) {
+            return item.permissions?.can_read;
+          }
+          return item.children && item.children.length > 0;
+        });
+    }
+    return filterItems(navItems);
+  }, [navItems]);
+
+  const dynamicLinks = filteredNavItems.map((item) => {
+    const Icon = (item.icon && (LucideIcons as any)[item.icon]) || Circle;
+    return {
+      name: item.name,
+      href: item.path || undefined,
+      icon: Icon,
+      subItems: item.children && item.children.length > 0
+        ? item.children.map((child) => ({
+            name: child.name,
+            href: child.path || "#",
+          }))
+        : undefined,
+    };
+  });
 
   const toggleExpand = (name) => {
     if (!isSidebarOpen) {
@@ -160,11 +217,11 @@ export function AdminSidebar() {
     setExpandedMenus((prev) => ({ ...prev, [name]: !prev[name] }));
   };
 
-  const renderLink = (link) => {
+  const renderLink = (link: any) => {
     const hasSubItems = !!link.subItems;
     const isExpanded = expandedMenus[link.name];
-    const isActive = pathname === link.href || (hasSubItems && link.subItems.some(sub => pathname === sub.href)) || (pathname === "/" && link.name === "Dashboard");
-    const Icon = link.icon;
+    const isActive = pathname === link.href || (hasSubItems && link.subItems.some((sub: any) => pathname === sub.href)) || (pathname === "/" && link.name === "Dashboard");
+    const Icon = link.icon || Circle;
 
     return (
       <li key={link.name}>
@@ -197,7 +254,7 @@ export function AdminSidebar() {
             >
               <div className="overflow-hidden">
                 <ul className="mt-1 ml-4 pl-4 border-l border-border/50 space-y-1">
-                  {link.subItems.map((subLink) => {
+                  {link.subItems.map((subLink: any) => {
                     const isSubActive = pathname === subLink.href;
                     const cls = `block px-2 py-1.5 text-xs rounded-md transition-colors ${isSubActive
                       ? "text-blue-700 font-medium bg-blue-50"
@@ -273,7 +330,15 @@ export function AdminSidebar() {
               </h3>
             )}
             <ul className="space-y-1">
-              {overviewLinks.map(renderLink)}
+              {isLoadingNav ? (
+                <div className="px-4 py-2 flex items-center justify-center">
+                  <span className="size-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : dynamicLinks.length > 0 ? (
+                dynamicLinks.map(renderLink)
+              ) : (
+                <div className="px-4 py-2 text-xs text-muted-foreground">Tidak ada menu tersedia.</div>
+              )}
             </ul>
           </div>
 
