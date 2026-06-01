@@ -1,4 +1,4 @@
-import { OrderPage } from "@/components/public/order-section";
+import { OrderPage } from "./_components/order-section";
 
 export default function Order() {
   return (

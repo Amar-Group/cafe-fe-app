@@ -9,6 +9,8 @@ import {
   Circle, Clock, User, Phone, ArrowLeft, Check,
   QrCode, Wallet, Banknote, ChevronLeft
 } from "lucide-react";
+import { usePublicDishCategories } from "@/features/cafe/dish-category/hooks/use-dish-category";
+import { usePublicDishes } from "@/features/cafe/dish/hooks/use-dish";
 
 // ==========================================
 // 1. CAFE MENU DATA
@@ -89,10 +91,35 @@ export function FeaturedMenuSection() {
   const ref = useScrollReveal([activeTab]);
 
   // --- Cafe State ---
+  const { data: dishCategories } = usePublicDishCategories();
+  const { data: publicDishes } = usePublicDishes();
+
   const [showAllMenu, setShowAllMenu] = useState(false);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-  const row1Items = SIGNATURE_ITEMS.slice(0, 4);
-  const row2Items = SIGNATURE_ITEMS.slice(4, 8);
+
+  const apiSignatureItems = (publicDishes || []).slice(0, 8).map((dish, idx) => {
+    const badges = [
+      { badge: "Chef's Pick", badgeIcon: Award, badgeColor: "bg-cafe-olive text-white" },
+      { badge: "Best Seller", badgeIcon: Flame, badgeColor: "bg-cafe-orange text-white" },
+      { badge: "Fan Favorite", badgeIcon: Heart, badgeColor: "bg-rose-500 text-white" },
+      { badge: "New Arrival", badgeIcon: Flame, badgeColor: "bg-cafe-olive text-white" },
+    ];
+    const badgeObj = badges[idx % badges.length];
+
+    return {
+      id: dish.id,
+      name: dish.name,
+      category: dish.category?.name || "Main Course",
+      description: dish.description || "A delicious treat crafted with passion.",
+      image: dish.thumbnail 
+        ? (dish.thumbnail.startsWith('http') ? dish.thumbnail : `http://localhost:8000/uploads/${dish.thumbnail}`)
+        : "/images/cafe/pasta.png",
+      ...badgeObj,
+    };
+  });
+
+  const row1Items = apiSignatureItems.slice(0, 4);
+  const row2Items = apiSignatureItems.slice(4, 8);
 
   // --- Billiard State ---
   const [selectedTable, setSelectedTable] = useState<typeof BILLIARD_TABLES[0] | null>(null);
@@ -272,7 +299,7 @@ export function FeaturedMenuSection() {
               )}
 
               {/* View More Button */}
-              {SIGNATURE_ITEMS.length > 4 && !showAllMenu && (
+              {apiSignatureItems.length > 4 && !showAllMenu && (
                 <div className="text-center mt-10">
                   <button
                     onClick={() => setShowAllMenu(true)}
@@ -285,7 +312,7 @@ export function FeaturedMenuSection() {
               )}
 
               <p className="text-center mt-6 text-cafe-sand/40 text-xs tracking-wide">
-                Showing {showAllMenu ? SIGNATURE_ITEMS.length : 4} of {SIGNATURE_ITEMS.length} items
+                Showing {showAllMenu ? apiSignatureItems.length : 4} of {apiSignatureItems.length} items
               </p>
             </div>
           )}

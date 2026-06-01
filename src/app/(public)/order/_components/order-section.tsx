@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/stores/use-store";
 import { useScrollReveal } from "@/hooks/use-scroll-reveal"; 
 import { cn } from "@/lib/utils";
+import { useCreateDishOrder, useDishOrder } from "@/features/cafe/dish-order/hooks/use-dish-order";
+import { DishOrderDetailService } from "@/features/cafe/dish-order/services/dish-order-detail-service";
+import { useCreatePayment, useUpdatePayment } from "@/features/payment/hooks/use-payment";
+import { useNotification } from "@/components/ui/notification";
 import { 
   ArrowLeft, 
   ShoppingBag, 
@@ -39,24 +43,44 @@ export function OrderPage() {
   });
   
   // Alur Navigasi Internal Pembayaran (Mengikuti BilliardSection)
-  const [step, setStep] = useState<"form" | "payment" | "success">("form");
+  const [step, setStep] = useState<"form" | "payment" | "waiting-payment" | "success">("form");
   const [paymentMethod, setPaymentMethod] = useState<"qris" | "cash">("qris");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
+
+  const createDishOrder = useCreateDishOrder();
+  const createPayment = useCreatePayment();
+  const updatePayment = useUpdatePayment();
+  const { add: notify } = useNotification();
+
+  // Polling for payment status
+  const { data: polledOrder } = useDishOrder(createdOrderId || 0, {
+    refetchInterval: step === "waiting-payment" ? 3000 : false,
+  });
+
+  useEffect(() => {
+    // Apabila order sudah dibayar, otomatis ke halaman success
+    if (step === "waiting-payment" && (polledOrder as any)?.payment_status === "paid") {
+      setStep("success");
+      if (clearCart) clearCart();
+    }
+  }, [polledOrder, step, clearCart]);
 
   // Inisialisasi Scroll Reveal dengan dependency state
   const ref = useScrollReveal([orderType, cart, step, paymentMethod]);
 
   // Helper Kalkulasi Harga
   const parsePrice = (priceStr: string) => {
-    return parseInt(priceStr.replace(/[^0-9]/g, ""), 10) * 1000;
+    return parseInt(priceStr.replace(/[^0-9]/g, ""), 10);
   };
 
   const subtotal = cart.reduce((total, item) => {
     return total + parsePrice(item.price) * item.quantity;
   }, 0);
   
-  const taxAndService = subtotal * 0.1; // Pajak & Service 10%
-  const totalAmount = subtotal + taxAndService;
+  const tax = subtotal * 0.11; // Pajak 11%
+  const serviceFee = subtotal * 0.05; // Service Fee 5%
+  const totalAmount = subtotal + tax + serviceFee;
 
   const formatIDR = (amount: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -77,25 +101,131 @@ export function OrderPage() {
   };
 
   // Finalisasi Pembayaran & Pembuatan Pesanan
-  const handleFinalizeOrder = () => {
+  const handleFinalizeOrder = async () => {
     setIsSubmitting(true);
 
-    // Simulasi pengolahan objek payload data internal
-    const payloadData = {
-      items: cart,
-      type: orderType,
-      customer: formData,
-      payment: paymentMethod,
-      totalPaid: totalAmount
-    };
-    console.log("Processing order internally:", payloadData);
-    
-    setTimeout(() => {
+    try {
+      // 1. Create Dish Order
+      const res = await createDishOrder.mutateAsync({
+        guest_name: formData.name,
+        guest_phone: formData.phone,
+        total: String(subtotal),
+        tax: String(tax),
+        service_fee: String(serviceFee),
+        nett_price: String(totalAmount),
+        status: "pending",
+      });
+
+      // Extract the insertId depending on different potential response formats
+      let extractedId = null;
+      if (Array.isArray(res.data) && res.data[0]?.insertId) {
+        extractedId = res.data[0].insertId;
+      } else if (res.data?.id) {
+        extractedId = res.data.id;
+      } else if ((res as any).id) {
+        extractedId = (res as any).id;
+      } else if (typeof res.data === 'number' || typeof res.data === 'string') {
+        extractedId = res.data;
+      }
+
+      if (extractedId) {
+        const orderIdNum = Number(extractedId);
+        setCreatedOrderId(orderIdNum);
+        
+        // 2. Create Order Details
+        for (const item of cart) {
+          if (!item.dish_id) continue;
+          await DishOrderDetailService.create({
+            dish_order_id: orderIdNum,
+            dish_id: item.dish_id,
+            quantity: item.quantity,
+            notes: formData.notes || null,
+          });
+        }
+
+        // 3. Move to next step based on payment method
+        if (paymentMethod === "cash") {
+          setStep("waiting-payment");
+        } else {
+          // QRIS Flow (Midtrans Snap Integration)
+          const paymentPayload = {
+            type: "dish_order" as const,
+            dish_order_id: orderIdNum,
+            gross_amount: totalAmount.toString(),
+            method: "qris" as const,
+            provider: "midtrans" as const,
+          };
+
+          const paymentRes = await createPayment.mutateAsync(paymentPayload);
+          const result = paymentRes.data;
+
+          if (result && result.snap_token) {
+            if (typeof (window as any).snap !== "undefined") {
+              (window as any).snap.pay(result.snap_token, {
+                onSuccess: async function () {
+                  try {
+                    await updatePayment.mutateAsync({
+                      id: result.id,
+                      data: { status: "paid" }
+                    });
+                    setStep("success");
+                    if (clearCart) clearCart();
+                  } catch (e) {
+                    console.error("Failed updating payment status:", e);
+                  }
+                },
+                onPending: function () {
+                  notify("Payment pending. Please complete it.", "warning");
+                },
+                onError: function () {
+                  notify("Payment failed or encountered an error.", "error");
+                  setIsSubmitting(false);
+                },
+                onClose: function () {
+                  notify("Payment window closed before completing.", "warning");
+                  setIsSubmitting(false);
+                }
+              });
+            } else {
+              notify("Midtrans Snap is not loaded.", "error");
+              setIsSubmitting(false);
+            }
+          }
+        }
+      } else {
+        console.error("Could not extract order ID from response", res);
+        setIsSubmitting(false);
+      }
+    } catch (error) {
+      console.error("Failed to finalize order:", error);
+      notify("Failed to process your order. Please try again.", "error");
       setIsSubmitting(false);
-      setStep("success"); // Progress to confirmation screen
-      if (clearCart) clearCart(); // Kosongkan keranjang belanja setelah sukses
-    }, 1500);
+    }
   };
+
+  // --- WAITING PAYMENT STATE ---
+  if (step === "waiting-payment") {
+    return (
+      <div ref={ref} className="min-h-screen bg-cafe-cream flex items-center justify-center p-4 mt-20">
+        <div className="bg-white max-w-md w-full rounded-3xl p-8 text-center shadow-xl shadow-cafe-charcoal/5 border border-cafe-sand/50 space-y-6 cafe-reveal">
+          <div className="w-16 h-16 bg-cafe-orange/10 text-cafe-orange rounded-full flex items-center justify-center mx-auto animate-pulse">
+            <Store size={32} />
+          </div>
+          <div className="space-y-2">
+            <h2 className="font-display text-2xl font-bold text-cafe-charcoal">Waiting for Payment</h2>
+            <p className="text-cafe-charcoal/70 text-sm font-light leading-relaxed">
+              Order <span className="font-semibold text-cafe-brown">#{createdOrderId}</span> has been placed.
+              Please head to the cashier to complete your cash payment.
+            </p>
+          </div>
+          <div className="flex justify-center items-center gap-2 text-cafe-charcoal/50 text-xs">
+            <div className="w-4 h-4 border-2 border-cafe-orange border-t-transparent rounded-full animate-spin" />
+            Waiting for cashier confirmation...
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // --- STEP 3: SUCCESS STATE ---
   if (step === "success") {
@@ -349,8 +479,12 @@ export function OrderPage() {
                       <span>{formatIDR(subtotal)}</span>
                     </div>
                     <div className="flex justify-between text-cafe-charcoal/70">
-                      <span>Tax & Service (10%)</span>
-                      <span>{formatIDR(taxAndService)}</span>
+                      <span>Pajak (11%)</span>
+                      <span>{formatIDR(tax)}</span>
+                    </div>
+                    <div className="flex justify-between text-cafe-charcoal/70">
+                      <span>Service Fee (5%)</span>
+                      <span>{formatIDR(serviceFee)}</span>
                     </div>
                     <div className="flex justify-between text-base font-bold text-cafe-charcoal pt-3 border-t border-dashed border-cafe-sand">
                       <span className="font-display">Total Due</span>
@@ -407,8 +541,12 @@ export function OrderPage() {
                   <span className="text-cafe-charcoal font-medium">{formatIDR(subtotal)}</span>
                 </div>
                 <div className="flex justify-between mb-2">
-                  <span className="text-cafe-charcoal/60">Tax & Service (10%)</span>
-                  <span className="text-cafe-charcoal font-medium">{formatIDR(taxAndService)}</span>
+                  <span className="text-cafe-charcoal/60">Pajak (11%)</span>
+                  <span className="text-cafe-charcoal font-medium">{formatIDR(tax)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-cafe-charcoal/60">Service Fee (5%)</span>
+                  <span className="text-cafe-charcoal font-medium">{formatIDR(serviceFee)}</span>
                 </div>
                 <div className="border-t border-cafe-sand/60 my-3 pt-3 flex justify-between items-center">
                   <span className="font-semibold text-cafe-charcoal">Total Due</span>

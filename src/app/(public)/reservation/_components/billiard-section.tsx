@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useScrollReveal } from "@/hooks/use-scroll-reveal";
 import { cn } from "@/lib/utils";
 import {
@@ -14,23 +14,16 @@ import {
   Wallet,
   Banknote,
   ChevronLeft,
+  Store,
 } from "lucide-react";
 
-const BILLIARD_TABLES = [
-  { id: "01", name: "Table 1 (9-Ball)", bookedSlots: ["13:00", "14:00"] },
-  { id: "02", name: "Table 2 (9-Ball)", bookedSlots: ["15:00", "16:00", "19:00"] },
-  { id: "03", name: "Table 3 (9-Ball)", bookedSlots: [] },
-  { id: "04", name: "Table 4 (9-Ball)", bookedSlots: ["18:00", "20:00"] },
-  { id: "05", name: "Table 5 (VIP)", bookedSlots: ["14:00", "15:00"] },
-  { id: "06", name: "Table 6 (9-Ball)", bookedSlots: ["21:00"] },
-  { id: "07", name: "Table 7 (9-Ball)", bookedSlots: [] },
-  { id: "08", name: "Table 8 (VIP)", bookedSlots: ["19:00", "20:00", "21:00"] },
-];
-
-const TIME_SLOTS = [
-  "12:00", "13:00", "14:00", "15:00", "16:00",
-  "17:00", "18:00", "19:00", "20:00", "21:00", "22:00",
-];
+import { usePublicBilliardTables } from "@/features/billiard/table/hooks/use-table";
+import { BilliardTable } from "@/features/billiard/table/types";
+import { usePublicSchedules } from "@/features/billiard/schedule/hooks/use-schedule";
+import { Schedule } from "@/features/billiard/schedule/types";
+import { useCreateReservation, useReservation, useReservations } from "@/features/billiard/reservation/hooks/use-reservation";
+import { useCreatePayment, useUpdatePayment } from "@/features/payment/hooks/use-payment";
+import { useNotification } from "@/components/ui/notification";
 
 // Simulated hourly rates
 const RATE_STANDARD = 50000;
@@ -38,19 +31,41 @@ const RATE_VIP = 80000;
 
 export function BilliardSection() {
   const ref = useScrollReveal();
+  
+  const { data: billiardTables } = usePublicBilliardTables();
+  const { data: schedules } = usePublicSchedules();
+  const { data: allReservations } = useReservations();
 
-  const [selectedTable, setSelectedTable] = useState<typeof BILLIARD_TABLES[0] | null>(null);
-  const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
+  const [selectedTable, setSelectedTable] = useState<BilliardTable | null>(null);
+  const [selectedSchedules, setSelectedSchedules] = useState<Schedule[]>([]);
   const [formData, setFormData] = useState({ name: "", phone: "" });
   
   // Navigation internal state within the reservation container
-  const [step, setStep] = useState<"form" | "payment" | "success">("form");
+  const [step, setStep] = useState<"form" | "payment" | "waiting-payment" | "success">("form");
   const [paymentMethod, setPaymentMethod] = useState<"qris" | "cash">("qris");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdReservationId, setCreatedReservationId] = useState<number | null>(null);
+  const [finalTotal, setFinalTotal] = useState<number>(0);
+
+  const createReservation = useCreateReservation();
+  const createPayment = useCreatePayment();
+  const updatePayment = useUpdatePayment();
+  const { add: notify } = useNotification();
+
+  const { data: polledReservation } = useReservation(createdReservationId || 0, {
+    refetchInterval: step === "waiting-payment" ? 3000 : false,
+  });
+
+  useEffect(() => {
+    if (step === "waiting-payment" && (polledReservation as any)?.payment_status === "paid") {
+      setStep("success");
+    }
+  }, [polledReservation, step]);
 
   // Pricing calculations
-  const isVip = selectedTable?.name.toLowerCase().includes("vip");
-  const pricePerHour = isVip ? RATE_VIP : RATE_STANDARD;
-  const duration = selectedTimes.length;
+  const isVip = selectedTable?.type?.name?.toLowerCase().includes("vip") || selectedTable?.name?.toLowerCase().includes("vip") || false;
+  const pricePerHour = selectedTable ? Number(selectedTable.price) : 0;
+  const duration = selectedSchedules.length;
   const totalAmount = duration * pricePerHour;
 
   const formatIDR = (amount: number) => {
@@ -63,29 +78,153 @@ export function BilliardSection() {
 
   const handleBackToLayout = () => {
     setSelectedTable(null);
-    setSelectedTimes([]);
+    setSelectedSchedules([]);
     setStep("form");
     setFormData({ name: "", phone: "" });
   };
 
-  const handleTimeClick = (time: string) => {
-    setSelectedTimes((prev) => {
-      if (prev.includes(time)) {
-        return prev.filter((t) => t !== time);
+  const handleTimeClick = (schedule: Schedule) => {
+    setSelectedSchedules((prev) => {
+      const exists = prev.find((s) => s.id === schedule.id);
+      if (exists) {
+        return prev.filter((s) => s.id !== schedule.id);
       } else {
-        return [...prev, time].sort();
+        const newArr = [...prev, schedule];
+        return newArr.sort((a, b) => a.start_time.localeCompare(b.start_time));
       }
     });
   };
 
   const handleBookingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedTimes.length === 0 || !formData.name || !formData.phone) return;
+    if (selectedSchedules.length === 0 || !formData.name || !formData.phone) return;
     setStep("payment"); // Progress to payment step
   };
 
-  const handlePaymentSuccess = () => {
-    setStep("success"); // Progress to confirmation screen
+  const handleFinalizeReservation = async () => {
+    if (!selectedTable) return;
+    setIsSubmitting(true);
+    setFinalTotal(totalAmount);
+
+    try {
+      let firstReservationId: number | null = null;
+      
+      for (const schedule of selectedSchedules) {
+        const payload = {
+          billiard_table_id: selectedTable.id,
+          guest_name: formData.name,
+          guest_phone: formData.phone,
+          date: new Date().toISOString().split('T')[0],
+          schedule_id: schedule.id,
+          guest_count: 2,
+          notes: "",
+          status: "pending" as const,
+        };
+        const res = await createReservation.mutateAsync(payload);
+        
+        let extractedId = null;
+        if (Array.isArray(res.data) && res.data[0]?.insertId) {
+          extractedId = res.data[0].insertId;
+        } else if (res.data?.id) {
+          extractedId = res.data.id;
+        } else if ((res as any).id) {
+          extractedId = (res as any).id;
+        } else if (typeof res.data === 'number' || typeof res.data === 'string') {
+          extractedId = res.data;
+        }
+
+        if (extractedId && !firstReservationId) {
+          firstReservationId = Number(extractedId);
+        }
+      }
+
+      if (firstReservationId) {
+        setCreatedReservationId(firstReservationId);
+
+        if (paymentMethod === "cash") {
+          setStep("waiting-payment");
+        } else {
+          // QRIS Flow
+          const paymentPayload = {
+            type: "reservation" as const,
+            reservation_id: firstReservationId,
+            gross_amount: totalAmount.toString(),
+            method: "qris" as const,
+            provider: "midtrans" as const,
+          };
+
+          const paymentRes = await createPayment.mutateAsync(paymentPayload);
+          const result = paymentRes.data;
+
+          if (result && result.snap_token) {
+            if (typeof (window as any).snap !== "undefined") {
+              (window as any).snap.pay(result.snap_token, {
+                onSuccess: async function () {
+                  try {
+                    await updatePayment.mutateAsync({
+                      id: result.id,
+                      data: { status: "paid", paid_at: new Date().toISOString() },
+                    });
+                    notify({
+                      title: "Success",
+                      message: "Payment successful. Your reservation is confirmed.",
+                      variant: "success",
+                    });
+                    setStep("success");
+                  } catch (err) {
+                    notify({
+                      title: "Status Update Failed",
+                      message: "Payment succeeded but failed to update status.",
+                      variant: "danger",
+                    });
+                  }
+                },
+                onPending: function () {
+                  notify({
+                    title: "Pending",
+                    message: "Awaiting your payment to be completed.",
+                    variant: "info",
+                  });
+                  setIsSubmitting(false);
+                },
+                onError: function () {
+                  notify({
+                    title: "Failed",
+                    message: "Payment failed to process.",
+                    variant: "danger",
+                  });
+                  setIsSubmitting(false);
+                },
+                onClose: function () {
+                  setIsSubmitting(false);
+                },
+              });
+            } else {
+              notify({
+                title: "Error",
+                message: "Payment gateway is not fully loaded yet.",
+                variant: "danger",
+              });
+              setIsSubmitting(false);
+            }
+          } else {
+            notify({
+              title: "Error",
+              message: "Failed to generate payment token.",
+              variant: "danger",
+            });
+            setIsSubmitting(false);
+          }
+        }
+      }
+    } catch (err: any) {
+      notify({
+        title: "Reservation Failed",
+        message: err.message || "Something went wrong.",
+        variant: "danger",
+      });
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -117,7 +256,7 @@ export function BilliardSection() {
 
             {/* Table Floor Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-              {BILLIARD_TABLES.map((table, index) => (
+              {(billiardTables || []).map((table, index) => (
                 <div
                   key={table.id}
                   onClick={() => setSelectedTable(table)}
@@ -229,16 +368,27 @@ export function BilliardSection() {
                   </div>
 
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
-                    {TIME_SLOTS.map((time) => {
-                      const isBooked = selectedTable.bookedSlots.includes(time);
-                      const isSelected = selectedTimes.includes(time);
+                    {(schedules || []).map((schedule) => {
+                      const timeStr = `${schedule.start_time.slice(0, 5)} - ${schedule.end_time.slice(0, 5)}`;
+                      const todayStr = new Date().toISOString().split('T')[0];
+                      
+                      const isBooked = (allReservations || []).some(
+                        (res) => 
+                          res.billiard_table_id === selectedTable?.id &&
+                          res.schedule_id === schedule.id &&
+                          res.status !== "cancelled" &&
+                          res.date && 
+                          !isNaN(new Date(res.date).getTime()) &&
+                          new Date(res.date).toISOString().split('T')[0] === todayStr
+                      );
+                      const isSelected = selectedSchedules.some(s => s.id === schedule.id);
 
                       return (
                         <button
-                          key={time}
+                          key={schedule.id}
                           type="button"
                           disabled={isBooked}
-                          onClick={() => handleTimeClick(time)}
+                          onClick={() => handleTimeClick(schedule)}
                           className={cn(
                             "py-3 px-2 rounded-xl text-xs font-semibold tracking-wide border transition-all duration-300 relative overflow-hidden flex flex-col items-center justify-center gap-1",
                             isBooked && "bg-transparent border-dashed border-cafe-cream/5 text-cafe-sand/20 line-through cursor-not-allowed opacity-40",
@@ -247,7 +397,7 @@ export function BilliardSection() {
                           )}
                         >
                           <Clock size={12} className={cn(isSelected ? "text-black" : isBooked ? "text-cafe-sand/20" : "text-cafe-sand/40")} />
-                          <span>{time}</span>
+                          <span>{timeStr}</span>
                           {isSelected && (
                             <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-black rounded-full" />
                           )}
@@ -259,10 +409,10 @@ export function BilliardSection() {
 
                 <button
                   type="submit"
-                  disabled={selectedTimes.length === 0}
+                  disabled={selectedSchedules.length === 0}
                   className={cn(
-                    "w-full py-4 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all duration-1  00 mt-4 shadow-xl animate-in fade-in slide-in-from-bottom-4 delay-500 duration-700 ease-out fill-mode-both",
-                    selectedTimes.length > 0
+                    "w-full py-4 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all duration-100 mt-4 shadow-xl animate-in fade-in slide-in-from-bottom-4 delay-500 duration-700 ease-out fill-mode-both",
+                    selectedSchedules.length > 0
                       ? "bg-emerald-500 text-black hover:bg-emerald-400 shadow-emerald-950/20 cursor-pointer"
                       : "bg-cafe-cream/5 text-cafe-sand/30 border border-cafe-cream/5 cursor-not-allowed"
                   )}
@@ -302,7 +452,7 @@ export function BilliardSection() {
                     </div>
                     <div className="flex justify-between mb-2">
                       <span className="text-cafe-sand/60">Duration</span>
-                      <span className="text-white font-medium">{duration} Hr{duration > 1 ? "s" : ""} ({selectedTimes.length} Slot{selectedTimes.length > 1 ? "s" : ""})</span>
+                      <span className="text-white font-medium">{duration} Hr{duration > 1 ? "s" : ""} ({selectedSchedules.length} Slot{selectedSchedules.length > 1 ? "s" : ""})</span>
                     </div>
                     <div className="border-t border-cafe-cream/10 my-3 pt-3 flex justify-between items-center">
                       <span className="font-semibold text-cafe-cream">Total Due</span>
@@ -365,10 +515,13 @@ export function BilliardSection() {
                   )}
 
                   <button
-                    onClick={handlePaymentSuccess}
-                    className="w-full flex items-center justify-center px-6 py-4 bg-emerald-500 text-black rounded-2xl text-xs font-bold tracking-widest uppercase hover:bg-emerald-400 shadow-lg shadow-emerald-500/10 transition-all duration-300"
+                    onClick={handleFinalizeReservation}
+                    disabled={isSubmitting}
+                    className="w-full flex items-center justify-center px-6 py-4 bg-emerald-500 text-black rounded-2xl text-xs font-bold tracking-widest uppercase hover:bg-emerald-400 shadow-lg shadow-emerald-500/10 transition-all duration-300 disabled:bg-emerald-800 disabled:text-emerald-950 disabled:cursor-not-allowed"
                   >
-                    {paymentMethod === "qris" ? (
+                    {isSubmitting ? (
+                      <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                    ) : paymentMethod === "qris" ? (
                       <>
                         <Wallet size={16} className="mr-2" />
                         I Have Paid
@@ -384,7 +537,28 @@ export function BilliardSection() {
               </div>
             )}
 
-            {/* STEP 3: SUCCESS */}
+            {/* STEP 3: WAITING PAYMENT */}
+            {step === "waiting-payment" && (
+              <div className="text-center py-8 flex flex-col items-center justify-center animate-in fade-in zoom-in-50 duration-700 ease-out fill-mode-both">
+                <div className="w-16 h-16 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+                  <Store size={32} />
+                </div>
+                <h3 className="font-display text-2xl text-cafe-cream font-medium mb-2">Waiting for Payment</h3>
+                <p className="text-cafe-sand/50 text-sm max-w-sm leading-relaxed mb-6">
+                  Reservation for <span className="text-emerald-400 font-semibold">{selectedTable.name}</span> on: <br />
+                  <span className="text-white font-medium bg-white/5 px-3 py-1 rounded-md inline-block mt-2 mb-2">
+                    {selectedSchedules.map(s => `${s.start_time.slice(0,5)} - ${s.end_time.slice(0,5)}`).join(", ")}
+                  </span> <br />
+                  has been placed. Please complete your cash payment at the cashier.
+                </p>
+                <div className="flex justify-center items-center gap-2 text-emerald-400/70 text-xs">
+                  <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                  Waiting for cashier confirmation...
+                </div>
+              </div>
+            )}
+
+            {/* STEP 4: SUCCESS */}
             {step === "success" && (
               <div className="text-center py-8 flex flex-col items-center justify-center">
                 <div className="animate-in fade-in zoom-in-50 duration-700 ease-out fill-mode-both">
@@ -397,7 +571,7 @@ export function BilliardSection() {
                 <p className="text-cafe-sand/50 text-sm max-w-sm leading-relaxed mb-6 animate-in fade-in slide-in-from-bottom-4 delay-150 duration-700 ease-out fill-mode-both">
                   Thank you, <span className="text-white font-medium">{formData.name}</span>. Your reservation for <span className="text-emerald-400 font-semibold">{selectedTable.name}</span> on: <br />
                   <span className="text-white font-medium bg-white/5 px-3 py-1 rounded-md inline-block mt-2 mb-2">
-                    {selectedTimes.join(", ")}
+                    {selectedSchedules.map(s => `${s.start_time.slice(0,5)} - ${s.end_time.slice(0,5)}`).join(", ")}
                   </span> <br />
                   has been successfully registered.
                   {paymentMethod === "qris" 
@@ -405,10 +579,10 @@ export function BilliardSection() {
                     : " Please remember to settle your payment at the cashier."}
                 </p>
 
-                <div className="bg-cafe-dark/50 border border-cafe-cream/5 rounded-2xl p-4 w-full max-w-sm mb-8 animate-in fade-in slide-in-from-bottom-4 delay-200 duration-700 ease-out fill-mode-both text-left space-y-2 text-sm">
+                 <div className="bg-cafe-dark/50 border border-cafe-cream/5 rounded-2xl p-4 w-full max-w-sm mb-8 animate-in fade-in slide-in-from-bottom-4 delay-200 duration-700 ease-out fill-mode-both text-left space-y-2 text-sm">
                    <div className="flex justify-between">
                      <span className="text-cafe-sand/50">Total Amount</span>
-                     <span className="text-emerald-400 font-bold">{formatIDR(totalAmount)}</span>
+                     <span className="text-emerald-400 font-bold">{formatIDR(finalTotal)}</span>
                    </div>
                    <div className="flex justify-between">
                      <span className="text-cafe-sand/50">Payment Method</span>

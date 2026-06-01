@@ -9,17 +9,19 @@ export const DISH_ORDER_KEYS = {
   detail: (id: number) => [...DISH_ORDER_KEYS.details(), id] as const,
 };
 
-export function useDishOrders() {
+export function useDishOrders(options?: any) {
   return useQuery({
     queryKey: DISH_ORDER_KEYS.lists(),
     queryFn: async () => {
       const res = await DishOrderService.getAll();
       return res.data;
     },
+    refetchInterval: 5000,
+    ...options,
   });
 }
 
-export function useDishOrder(id: number) {
+export function useDishOrder(id: number, options?: any) {
   return useQuery({
     queryKey: DISH_ORDER_KEYS.detail(id),
     queryFn: async () => {
@@ -27,6 +29,7 @@ export function useDishOrder(id: number) {
       return res.data;
     },
     enabled: !!id,
+    ...options,
   });
 }
 

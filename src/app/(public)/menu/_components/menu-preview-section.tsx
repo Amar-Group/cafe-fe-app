@@ -7,64 +7,50 @@ import { useScrollReveal } from "@/hooks/use-scroll-reveal";
 import { Flame, Leaf, Search, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/stores/use-store"; // <-- Import Zustand Store
-
-/* ── Menu Data ── */
-const CATEGORIES = [
-  "All",
-  "Coffee",
-  "Non Coffee",
-  "Tea",
-  "Mocktail",
-  "Main Course",
-  "Pasta",
-  "Rice Bowl",
-  "Dessert",
-  "Pastry",
-  "Snacks",
-] as const;
-
-type Category = (typeof CATEGORIES)[number];
-
-interface MenuItem {
-  name: string;
-  category: Category;
-  price: string;
-  image: string;
-  description: string;
-  bestSeller?: boolean;
-  isNew?: boolean;
-  spicyLevel?: number;
-  vegetarian?: boolean;
-}
-
-const MENU_ITEMS: MenuItem[] = [
-  { name: "House Blend Espresso", category: "Coffee", price: "28K", image: "/images/cafe/signature-drink.png", description: "Rich double-shot espresso from single-origin beans", bestSeller: true },
-  { name: "Oat Milk Latte", category: "Coffee", price: "42K", image: "/images/cafe/signature-drink.png", description: "Smooth espresso with creamy oat milk and vanilla" },
-  { name: "Matcha Latte", category: "Non Coffee", price: "45K", image: "/images/cafe/signature-drink.png", description: "Premium ceremonial grade matcha with steamed milk", bestSeller: true },
-  { name: "Tropical Sunset", category: "Mocktail", price: "48K", image: "/images/cafe/signature-drink.png", description: "Mango, passion fruit, and sparkling water with mint", isNew: true },
-  { name: "Jasmine Oolong", category: "Tea", price: "35K", image: "/images/cafe/signature-drink.png", description: "Fragrant jasmine infused Taiwanese oolong" },
-  { name: "Truffle Carbonara", category: "Pasta", price: "89K", image: "/images/cafe/pasta.png", description: "Creamy carbonara with truffle oil and crispy bacon", bestSeller: true },
-  { name: "Teriyaki Rice Bowl", category: "Rice Bowl", price: "72K", image: "/images/cafe/food-spread.png", description: "Glazed chicken teriyaki with steamed rice and veggies", spicyLevel: 1 },
-  { name: "Grilled Salmon", category: "Main Course", price: "125K", image: "/images/cafe/food-spread.png", description: "Atlantic salmon with lemon butter and asparagus" },
-  { name: "Crème Brûlée", category: "Dessert", price: "55K", image: "/images/cafe/dessert.png", description: "Classic French vanilla custard with caramelized top", bestSeller: true },
-  { name: "Butter Croissant", category: "Pastry", price: "32K", image: "/images/cafe/dessert.png", description: "Flaky, golden French croissant with premium butter" },
-  { name: "Truffle Fries", category: "Snacks", price: "45K", image: "/images/cafe/food-spread.png", description: "Crispy fries tossed in truffle oil and parmesan" },
-  { name: "Korean Fried Chicken", category: "Snacks", price: "68K", image: "/images/cafe/food-spread.png", description: "Double-fried chicken with sweet gochujang glaze", spicyLevel: 2, isNew: true },
-  { name: "Mushroom Risotto", category: "Main Course", price: "85K", image: "/images/cafe/pasta.png", description: "Creamy arborio rice with wild mushrooms and herbs", vegetarian: true },
-  { name: "Cold Brew Tonic", category: "Coffee", price: "45K", image: "/images/cafe/signature-drink.png", description: "24-hour cold brew with tonic water and citrus", isNew: true },
-  { name: "Strawberry Cheesecake", category: "Dessert", price: "58K", image: "/images/cafe/dessert.png", description: "NY-style cheesecake with fresh strawberry compote" },
-  { name: "Aglio Olio", category: "Pasta", price: "75K", image: "/images/cafe/pasta.png", description: "Spaghetti with garlic, chili, olive oil, and prawns", spicyLevel: 1 },
-];
+import { usePublicDishCategories } from "@/features/cafe/dish-category/hooks/use-dish-category";
+import { usePublicDishes } from "@/features/cafe/dish/hooks/use-dish";
 
 export function MenuPreviewSection() {
   const router = useRouter();
   const addToCart = useStore((state) => state.addToCart); // <-- Selector-based access
-  const [activeCategory, setActiveCategory] = useState<Category>("All");
+  
+  const { data: dishes } = usePublicDishes();
+  const { data: categories } = usePublicDishCategories();
+
+  const apiCategories = ["All", ...(categories || []).map((c) => c.name)];
+
+  const apiMenuItems = (dishes || []).map((dish, idx) => {
+    const badges = [
+      { bestSeller: true },
+      { isNew: true },
+      { spicyLevel: 1 },
+      { vegetarian: true },
+      {},
+    ];
+    const badgeObj = badges[idx % badges.length];
+
+    return {
+      dish_id: dish.id,
+      name: dish.name,
+      category: dish.category?.name || "Main Course",
+      description: dish.description || "A delicious treat crafted with passion.",
+      image: dish.thumbnail 
+        ? (dish.thumbnail.startsWith('http') ? dish.thumbnail : `http://localhost:8000/uploads/${dish.thumbnail}`)
+        : "/images/cafe/pasta.png",
+      price: new Intl.NumberFormat("id-ID", {
+        style: "currency",
+        currency: "IDR",
+        minimumFractionDigits: 0,
+      }).format(Number(dish.price)),
+      ...badgeObj,
+    };
+  });
+
+  const [activeCategory, setActiveCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
-  const ref = useScrollReveal([activeCategory, searchQuery, showAll]);
-
-  const filteredItems = MENU_ITEMS.filter((item) => {
+  
+  const filteredItems = apiMenuItems.filter((item) => {
     const matchesCategory =
       activeCategory === "All" || item.category === activeCategory;
     const matchesSearch =
@@ -73,6 +59,8 @@ export function MenuPreviewSection() {
       item.description.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  const ref = useScrollReveal([activeCategory, searchQuery, showAll, filteredItems.length]);
 
   const displayedItems = showAll ? filteredItems : filteredItems.slice(0, 8);
 
@@ -124,7 +112,7 @@ export function MenuPreviewSection() {
         {/* Category Tabs */}
         <div className="mb-12 cafe-reveal">
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2 px-1">
-            {CATEGORIES.map((cat) => (
+            {apiCategories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => {
@@ -209,7 +197,9 @@ export function MenuPreviewSection() {
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
+                      import("@/utils/fly-to-cart").then(({ flyToCart }) => flyToCart(e, item.image));
                       addToCart({
+                        dish_id: item.dish_id,
                         name: item.name,
                         price: item.price,
                         category: item.category,

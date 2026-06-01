@@ -1,8 +1,8 @@
-import { HeroSection } from "@/components/public/hero-section";
-import { FeaturedMenuSection } from "@/components/public/featured-menu-section";
-import { TestimonialsSection } from "@/components/public/testimonials-section";
-import { CtaSection } from "@/components/public/cta-section";
-import { OwnerQuoteSection } from "@/components/public/owner-section";
+import { HeroSection } from "./_components/hero-section";
+import { FeaturedMenuSection } from "./_components/featured-menu-section";
+import { TestimonialsSection } from "./_components/testimonials-section";
+import { CtaSection } from "./_components/cta-section";
+import { OwnerQuoteSection } from "./_components/owner-section";
 
 export default function HomePage() {
   return (

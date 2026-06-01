@@ -9,17 +9,19 @@ export const RESERVATION_KEYS = {
   detail: (id: number) => [...RESERVATION_KEYS.details(), id] as const,
 };
 
-export function useReservations() {
+export function useReservations(options?: any) {
   return useQuery({
     queryKey: RESERVATION_KEYS.lists(),
     queryFn: async () => {
       const res = await ReservationService.getAll();
       return res.data;
     },
+    refetchInterval: 5000,
+    ...options,
   });
 }
 
-export function useReservation(id: number) {
+export function useReservation(id: number, options?: any) {
   return useQuery({
     queryKey: RESERVATION_KEYS.detail(id),
     queryFn: async () => {
@@ -27,6 +29,7 @@ export function useReservation(id: number) {
       return res.data;
     },
     enabled: !!id,
+    ...options,
   });
 }
 

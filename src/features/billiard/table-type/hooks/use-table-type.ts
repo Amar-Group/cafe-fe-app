@@ -22,6 +22,16 @@ export function useBilliardTableTypes() {
   });
 }
 
+export function usePublicBilliardTableTypes() {
+  return useQuery({
+    queryKey: [...BILLIARD_TABLE_TYPE_KEYS.lists(), "public"],
+    queryFn: async () => {
+      const res = await BilliardTableTypeService.getPublicAll();
+      return res.data;
+    },
+  });
+}
+
 export function useBilliardTableType(id: number) {
   return useQuery({
     queryKey: BILLIARD_TABLE_TYPE_KEYS.detail(id),

@@ -2,13 +2,15 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { PaymentService } from "../services/payment-service";
 import type { CreatePaymentRequest } from "../types";
 
-export function usePayments() {
+export function usePayments(options?: any) {
   return useQuery({
     queryKey: ["payments"],
     queryFn: async () => {
       const res = await PaymentService.getAll();
       return res.data;
     },
+    refetchInterval: 5000,
+    ...options,
   });
 }
 

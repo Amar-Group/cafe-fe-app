@@ -170,7 +170,7 @@ export function CafeNavbar() {
               )}
             >
               <div className="relative flex items-center justify-center">
-                <ShoppingBag size={15} />
+                <ShoppingBag size={15} className="cart-icon transition-transform" />
                 {/* Real-time Badge Indicator */}
                 {cartCount > 0 && (
                   <span className="absolute -top-2.5 -right-2.5 bg-cafe-orange text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center animate-bounce">
@@ -181,6 +181,27 @@ export function CafeNavbar() {
               Order Now
             </button>
             
+            {/* Mobile Cart Icon */}
+            <button
+              onClick={() => {
+                setMobileOpen(false);
+                router.push("/order");
+              }}
+              className={cn(
+                "sm:hidden relative p-2 rounded-lg transition-colors duration-300",
+                isSolid
+                  ? "text-cafe-charcoal hover:bg-cafe-sand/50"
+                  : "text-cafe-cream hover:bg-white/10"
+              )}
+            >
+              <ShoppingBag size={22} className="cart-icon transition-transform" />
+              {cartCount > 0 && (
+                <span className="absolute top-0 right-0 bg-cafe-orange text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center animate-bounce shadow-sm">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+
             {/* Mobile Toggle */}
             <button
               onClick={() => setMobileOpen(!mobileOpen)}

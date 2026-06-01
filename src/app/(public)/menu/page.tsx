@@ -1,4 +1,4 @@
-import { MenuPreviewSection } from "@/components/public/menu-preview-section";
+import { MenuPreviewSection } from "./_components/menu-preview-section";
 
 export default function MenuPage() {
   return (

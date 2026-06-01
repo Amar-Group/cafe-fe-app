@@ -1,4 +1,4 @@
-import { LocationSection } from "@/components/public/location-section";
+import { LocationSection } from "./_components/location-section";
 
 export default function ContactPage() {
   return (

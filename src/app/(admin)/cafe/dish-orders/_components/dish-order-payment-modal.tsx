@@ -8,6 +8,7 @@ import { useCreatePayment, useUpdatePayment } from "@/features/payment/hooks/use
 import { useQueryClient } from "@tanstack/react-query";
 import { CreditCard, Banknote } from "lucide-react";
 import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter, ModalClose } from "@/components/ui/modal";
+import { ConfirmModal } from "@/components/shared/confirm-modal";
 
 export function DishOrderPaymentModal() {
   const { isPaymentModalOpen, selectedOrderForPayment, closePaymentModal } = useDishOrderPaymentStore();
@@ -17,10 +18,11 @@ export function DishOrderPaymentModal() {
   const updatePayment = useUpdatePayment();
 
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "qris">("cash");
+  const [showCashConfirm, setShowCashConfirm] = useState(false);
 
   if (!selectedOrderForPayment) return null;
 
-  const handlePayment = async () => {
+  const executePayment = async () => {
     try {
       const payload = {
         type: "dish_order" as const,
@@ -40,6 +42,7 @@ export function DishOrderPaymentModal() {
           variant: "success",
         });
         queryClient.invalidateQueries({ queryKey: ["dish-orders"] });
+        setShowCashConfirm(false);
         closePaymentModal();
       } else if (paymentMethod === "qris" && result.snap_token) {
         // Trigger Midtrans Snap
@@ -101,7 +104,16 @@ export function DishOrderPaymentModal() {
     }
   };
 
+  const handlePaymentClick = () => {
+    if (paymentMethod === "cash") {
+      setShowCashConfirm(true);
+    } else {
+      executePayment();
+    }
+  };
+
   return (
+    <>
     <Modal
       open={isPaymentModalOpen}
       onClose={closePaymentModal}
@@ -149,7 +161,7 @@ export function DishOrderPaymentModal() {
         <Button variant="outline" onClick={closePaymentModal} disabled={createPayment.isPending || updatePayment.isPending}>
           Batal
         </Button>
-        <Button onClick={handlePayment} disabled={createPayment.isPending || updatePayment.isPending}>
+        <Button onClick={handlePaymentClick} disabled={createPayment.isPending || updatePayment.isPending}>
           {createPayment.isPending || updatePayment.isPending
             ? "Memproses..."
             : paymentMethod === "cash"
@@ -158,5 +170,15 @@ export function DishOrderPaymentModal() {
         </Button>
       </ModalFooter>
     </Modal>
+    <ConfirmModal
+      open={showCashConfirm}
+      onOpenChange={setShowCashConfirm}
+      onConfirm={executePayment}
+      isPending={createPayment.isPending || updatePayment.isPending}
+      title="Konfirmasi Pembayaran Tunai"
+      description="Apakah Anda yakin ingin menyelesaikan pesanan ini dengan pembayaran tunai (Cash)?"
+      confirmText="Ya, Selesaikan"
+    />
+    </>
   );
 }
