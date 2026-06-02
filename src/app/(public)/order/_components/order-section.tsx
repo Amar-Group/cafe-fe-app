@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useCreateDishOrder, useDishOrder } from "@/features/cafe/dish-order/hooks/use-dish-order";
 import { DishOrderDetailService } from "@/features/cafe/dish-order/services/dish-order-detail-service";
 import { useCreatePayment, useUpdatePayment } from "@/features/payment/hooks/use-payment";
+import { PaymentService } from "@/features/payment/services/payment-service";
 import { useNotification } from "@/components/ui/notification";
 import { 
   ArrowLeft, 
@@ -47,6 +48,7 @@ export function OrderPage() {
   const [paymentMethod, setPaymentMethod] = useState<"qris" | "cash">("qris");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
+  const [finalAmount, setFinalAmount] = useState<number>(0);
 
   const createDishOrder = useCreateDishOrder();
   const createPayment = useCreatePayment();
@@ -103,6 +105,7 @@ export function OrderPage() {
   // Finalisasi Pembayaran & Pembuatan Pesanan
   const handleFinalizeOrder = async () => {
     setIsSubmitting(true);
+    setFinalAmount(totalAmount);
 
     try {
       // 1. Create Dish Order
@@ -163,16 +166,16 @@ export function OrderPage() {
             if (typeof (window as any).snap !== "undefined") {
               (window as any).snap.pay(result.snap_token, {
                 onSuccess: async function () {
+                  // Trigger backend to sync with Midtrans immediately
+                  // so the WhatsApp notification is sent without waiting for the webhook
                   try {
-                    await updatePayment.mutateAsync({
-                      id: result.id,
-                      data: { status: "paid" }
-                    });
-                    setStep("success");
-                    if (clearCart) clearCart();
+                    await PaymentService.sync(result.id);
                   } catch (e) {
-                    console.error("Failed updating payment status:", e);
+                    console.error("Failed to sync payment status", e);
                   }
+                  
+                  setStep("success");
+                  if (clearCart) clearCart();
                 },
                 onPending: function () {
                   notify("Payment pending. Please complete it.", "warning");
@@ -248,7 +251,7 @@ export function OrderPage() {
           <div className="bg-cafe-cream/30 border border-cafe-sand rounded-2xl p-4 w-full text-left space-y-2 text-sm">
              <div className="flex justify-between">
                <span className="text-cafe-charcoal/60">Total Amount</span>
-               <span className="text-cafe-orange font-bold">{formatIDR(totalAmount)}</span>
+               <span className="text-cafe-orange font-bold">{formatIDR(finalAmount || totalAmount)}</span>
              </div>
              <div className="flex justify-between">
                <span className="text-cafe-charcoal/60">Payment Method</span>
