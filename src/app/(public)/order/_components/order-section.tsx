@@ -58,11 +58,13 @@ export function OrderPage() {
   // Polling for payment status
   const { data: polledOrder } = useDishOrder(createdOrderId || 0, {
     refetchInterval: step === "waiting-payment" ? 3000 : false,
+    refetchIntervalInBackground: true,
   });
 
   useEffect(() => {
-    // Apabila order sudah dibayar, otomatis ke halaman success
-    if (step === "waiting-payment" && (polledOrder as any)?.payment_status === "paid") {
+    // Apabila order sudah dibayar ATAU diselesaikan oleh admin, otomatis ke halaman success
+    const isPaid = (polledOrder as any)?.payment_status === "paid" || (polledOrder as any)?.status === "completed";
+    if (step === "waiting-payment" && isPaid) {
       setStep("success");
       if (clearCart) clearCart();
     }

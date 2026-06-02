@@ -221,7 +221,7 @@ export function CafeNavbar() {
       {/* ── Mobile Menu ── */}
       <div
         className={cn(
-          "fixed inset-0 z-30 md:hidden transition-all duration-500",
+          "fixed inset-0 z-50 md:hidden transition-all duration-500",
           mobileOpen
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"
@@ -237,7 +237,20 @@ export function CafeNavbar() {
             mobileOpen ? "translate-x-0" : "translate-x-full"
           )}
         >
-          <div className="p-6 pt-20 flex flex-col gap-2">
+          {/* Mobile Menu Header */}
+          <div className="flex items-center justify-between p-6 pb-4 border-b border-cafe-sand/30">
+            <span className="font-display font-semibold tracking-widest text-lg text-cafe-charcoal">
+              Savoria
+            </span>
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="p-2 rounded-lg text-cafe-charcoal hover:bg-cafe-sand/50 transition-colors"
+            >
+              <X size={22} />
+            </button>
+          </div>
+          
+          <div className="p-6 pt-6 flex flex-col gap-2">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}

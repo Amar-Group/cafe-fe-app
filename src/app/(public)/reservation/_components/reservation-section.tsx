@@ -1,77 +1,162 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useScrollReveal } from "@/hooks/use-scroll-reveal";
 import { cn } from "@/lib/utils";
 import {
   Clock,
-  Timer,
   MessageSquare,
   Check,
   LayoutGrid,
   QrCode,
-  ChevronLeft,
   Wallet,
   Banknote,
+  Users,
+  Calendar,
 } from "lucide-react";
 
-const TIME_SLOTS = [
-  "08:00", "09:00", "10:00", "11:00", "12:00",
-  "13:00", "14:00", "15:00", "16:00", "17:00",
-  "18:00", "19:00", "20:00", "21:00",
-  "22:00", "23:00",
-];
-
-const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6];
-
-// Harga simulasi per jam
-const RATE_STANDARD = 50000;
-const RATE_VIP = 80000;
+import { usePublicBilliardTables } from "@/features/billiard/table/hooks/use-table";
+import { usePublicSchedules } from "@/features/billiard/schedule/hooks/use-schedule";
+import { useCreateReservation, useReservation } from "@/features/billiard/reservation/hooks/use-reservation";
+import { useCreatePayment } from "@/features/payment/hooks/use-payment";
+import { PaymentService } from "@/features/payment/services/payment-service";
 
 export function ReservationSection() {
   const ref = useScrollReveal();
 
+  // Queries
+  const { data: tablesData } = usePublicBilliardTables();
+  const tables = tablesData || [];
+
+  const { data: schedulesData } = usePublicSchedules();
+  const schedules = schedulesData || [];
+
+  const createReservation = useCreateReservation();
+  const createPayment = useCreatePayment();
+
   // Navigation State
-  const [step, setStep] = useState<"form" | "payment" | "success">("form");
+  const [step, setStep] = useState<"form" | "waiting-payment" | "success">("form");
   const [isRetrying, setIsRetrying] = useState(false);
+  const [createdReservationId, setCreatedReservationId] = useState<number | null>(null);
+
+  // Polling for payment status
+  const { data: polledReservation } = useReservation(createdReservationId || 0, {
+    refetchInterval: step === "waiting-payment" ? 3000 : false,
+    refetchIntervalInBackground: true,
+  });
+
+  useEffect(() => {
+    // If order is paid or completed, move to success
+    const isPaid = (polledReservation as any)?.payment_status === "paid" || (polledReservation as any)?.status === "completed";
+    if (step === "waiting-payment" && isPaid) {
+      setStep("success");
+    }
+  }, [polledReservation, step]);
 
   // Input States
-  const [selectedTable, setSelectedTable] = useState("");
-  const [selectedTime, setSelectedTime] = useState("");
-  const [duration, setDuration] = useState<number>(0);
+  const [selectedTableId, setSelectedTableId] = useState("");
+  const [selectedScheduleId, setSelectedScheduleId] = useState("");
+  const [guestCount, setGuestCount] = useState<number>(2);
+  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]); // YYYY-MM-DD
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"qris" | "cash">("qris");
+  const [finalAmount, setFinalAmount] = useState<number>(0);
 
-  // Kalkulasi Harga
-  const isVip = selectedTable.toLowerCase().includes("vip");
-  const pricePerHour = isVip ? RATE_VIP : RATE_STANDARD;
-  const totalAmount = duration * pricePerHour;
+  // Calculated Price
+  const selectedTable = tables.find((t) => t.id === Number(selectedTableId));
+  const selectedSchedule = schedules.find((s) => s.id === Number(selectedScheduleId));
+  
+  const totalAmount = selectedTable ? Number(selectedTable.price) : 0;
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!duration) {
-      alert("Please select a duration (hours) for your booking.");
+    if (!selectedTableId || !selectedScheduleId) {
+      alert("Please select a table and time slot.");
       return;
     }
-    setStep("payment");
-  };
 
-  const handlePaymentSuccess = () => {
-    setStep("success");
+    try {
+      // 1. Create Reservation
+      const resData = await createReservation.mutateAsync({
+        billiard_table_id: Number(selectedTableId),
+        guest_name: name,
+        guest_phone: phone,
+        date: date,
+        schedule_id: Number(selectedScheduleId),
+        guest_count: guestCount,
+        notes: notes || null,
+        status: "pending",
+      });
+
+      const newReservationId = resData.data?.id;
+      if (!newReservationId) throw new Error("Failed to create reservation");
+
+      setCreatedReservationId(newReservationId);
+      setFinalAmount(totalAmount);
+
+      // 2. Process Payment
+      if (paymentMethod === "qris") {
+        const paymentRes = await createPayment.mutateAsync({
+          type: "reservation",
+          reservation_id: newReservationId,
+          method: "qris",
+          provider: "midtrans",
+          gross_amount: totalAmount,
+        });
+
+        const snapToken = paymentRes.data?.snap_token;
+        if (snapToken && typeof window !== "undefined" && (window as any).snap) {
+          (window as any).snap.pay(snapToken, {
+            onSuccess: async function (result: any) {
+              if (paymentRes.data?.id) {
+                await PaymentService.sync(paymentRes.data.id);
+              }
+              setStep("success");
+            },
+            onPending: function (result: any) {
+              setStep("waiting-payment");
+            },
+            onError: function (result: any) {
+              alert("Payment failed!");
+              setStep("form");
+            },
+            onClose: function () {
+              setStep("waiting-payment");
+            },
+          });
+        } else {
+          setStep("waiting-payment");
+        }
+      } else {
+        // Cash payment
+        await createPayment.mutateAsync({
+          type: "reservation",
+          reservation_id: newReservationId,
+          method: "cash",
+          provider: "cashier",
+          gross_amount: totalAmount,
+        });
+        setStep("waiting-payment");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Something went wrong");
+    }
   };
 
   const handleReset = () => {
     setName("");
     setPhone("");
-    setSelectedTable("");
-    setSelectedTime("");
-    setDuration(0);
+    setSelectedTableId("");
+    setSelectedScheduleId("");
+    setGuestCount(2);
     setNotes("");
     setPaymentMethod("qris");
     setStep("form");
     setIsRetrying(true);
+    setCreatedReservationId(null);
 
     setTimeout(() => {
       document.getElementById("reservation")?.scrollIntoView({
@@ -81,7 +166,6 @@ export function ReservationSection() {
     }, 100);
   };
 
-  // Format ke Rupiah
   const formatIDR = (amount: number) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -125,31 +209,31 @@ export function ReservationSection() {
                 <span className="font-semibold">: {name}</span>
               </li>
               <li className="flex items-start">
-                <span className="font-medium text-cafe-charcoal/50 w-32 shrink-0">Table No.</span>
-                <span className="font-semibold">: {selectedTable}</span>
+                <span className="font-medium text-cafe-charcoal/50 w-32 shrink-0">Table</span>
+                <span className="font-semibold">: {selectedTable?.name}</span>
+              </li>
+              <li className="flex items-start">
+                <span className="font-medium text-cafe-charcoal/50 w-32 shrink-0">Date</span>
+                <span className="font-semibold">: {date}</span>
               </li>
               <li className="flex items-start">
                 <span className="font-medium text-cafe-charcoal/50 w-32 shrink-0">Time</span>
-                <span className="font-semibold">: {selectedTime}</span>
-              </li>
-              <li className="flex items-start">
-                <span className="font-medium text-cafe-charcoal/50 w-32 shrink-0">Duration</span>
-                <span className="font-semibold">: {duration} Hour(s)</span>
+                <span className="font-semibold">: {selectedSchedule?.start_time} - {selectedSchedule?.end_time}</span>
               </li>
               <li className="flex items-start">
                 <span className="font-medium text-cafe-charcoal/50 w-32 shrink-0">Payment Method</span>
                 <span className="font-semibold uppercase">: {paymentMethod}</span>
               </li>
               <li className="flex items-start">
-                <span className="font-medium text-cafe-charcoal/50 w-32 shrink-0">Total Due</span>
-                <span className="font-semibold text-cafe-olive">: {formatIDR(totalAmount)}</span>
+                <span className="font-medium text-cafe-charcoal/50 w-32 shrink-0">Total Paid</span>
+                <span className="font-semibold text-cafe-olive">: {formatIDR(finalAmount)}</span>
               </li>
             </ul>
           </div>
 
           <button
             onClick={handleReset}
-            className="px-8 py-3.5 bg-cafe-charcoal text-cafe-cream rounded-full text-sm font-semibold tracking-wide hover:bg-cafe-dark transition-colors shadow-lg shadow-cafe-charcoal/10"
+            className="px-8 py-3 bg-white border border-cafe-sand text-cafe-charcoal rounded-full text-sm font-semibold hover:bg-cafe-sand/30 transition-all duration-300 shadow-sm"
           >
             Make Another Booking
           </button>
@@ -158,122 +242,46 @@ export function ReservationSection() {
     );
   }
 
-  // ========================
-  // RENDER TAHAP PEMBAYARAN
-  // ========================
-  if (step === "payment") {
+  // ====================
+  // RENDER TAHAP PAYMENT (WAITING)
+  // ====================
+  if (step === "waiting-payment") {
     return (
       <section
         id="reservation"
         ref={ref}
         className="relative py-24 md:py-32 bg-cafe-cream overflow-hidden"
       >
-        <div className="max-w-md mx-auto px-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <button
-            onClick={() => setStep("form")}
-            className="flex items-center text-sm font-medium text-cafe-charcoal/60 hover:text-cafe-brown mb-8 transition-colors"
-          >
-            <ChevronLeft size={16} className="mr-1" />
-            Back to edit details
-          </button>
+        <div className="max-w-lg mx-auto px-4 text-center animate-in fade-in zoom-in duration-500">
+          <div className="w-20 h-20 rounded-full border-4 border-cafe-brown/20 border-t-cafe-brown flex items-center justify-center mx-auto mb-6 animate-spin" />
+          
+          <h3 className="font-display text-3xl text-cafe-charcoal font-medium mb-4">
+            Waiting for Payment
+          </h3>
+          <p className="text-cafe-charcoal/60 font-light mb-8">
+            {paymentMethod === "qris" 
+              ? "Please complete your payment in the popup window. We are checking your transaction status..."
+              : "Your table is reserved! Please proceed to the cashier to pay."}
+          </p>
 
-          <div className="text-center mb-8">
-            <h3 className="font-display text-3xl text-cafe-charcoal font-medium mb-3">
-              Payment Method
-            </h3>
-            <p className="text-sm text-cafe-charcoal/70">
-              Select how you would like to pay to secure <br className="hidden sm:block" />
-              <strong>{selectedTable}</strong> at <strong>{selectedTime}</strong>.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-3xl shadow-xl shadow-cafe-charcoal/5 p-6 border border-cafe-sand/30">
-            {/* Order Summary */}
-            <div className="bg-cafe-cream/50 rounded-2xl p-4 mb-6 text-sm">
-              <div className="flex justify-between mb-2">
-                <span className="text-cafe-charcoal/60">Rate ({isVip ? "VIP" : "Standard"})</span>
-                <span className="font-medium">{formatIDR(pricePerHour)} / hr</span>
+          <div className="bg-white border border-cafe-sand/50 shadow-sm rounded-3xl p-6 md:p-8 text-left mb-8 w-full mx-auto relative overflow-hidden">
+            <h4 className="text-xs font-bold text-cafe-brown uppercase tracking-[0.2em] mb-5 border-b border-cafe-sand/30 pb-3 text-center">
+              Summary
+            </h4>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-cafe-charcoal/70">Table</span>
+                <span className="font-semibold">{selectedTable?.name}</span>
               </div>
-              <div className="flex justify-between mb-2">
-                <span className="text-cafe-charcoal/60">Duration</span>
-                <span className="font-medium">{duration} Hour(s)</span>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-cafe-charcoal/70">Time</span>
+                <span className="font-semibold">{selectedSchedule?.start_time}</span>
               </div>
-              <div className="border-t border-cafe-sand/50 my-3 pt-3 flex justify-between items-center">
-                <span className="font-semibold text-cafe-charcoal">Total Amount</span>
-                <span className="font-display text-xl text-cafe-brown font-semibold">{formatIDR(totalAmount)}</span>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-cafe-charcoal/70">Total Amount</span>
+                <span className="font-semibold text-lg text-cafe-brown">{formatIDR(totalAmount)}</span>
               </div>
             </div>
-
-            {/* Payment Options Selector */}
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              <button
-                type="button"
-                onClick={() => setPaymentMethod("qris")}
-                className={cn(
-                  "flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-200",
-                  paymentMethod === "qris"
-                    ? "border-cafe-brown bg-cafe-brown/5 text-cafe-brown"
-                    : "border-cafe-sand bg-white text-cafe-charcoal/60 hover:border-cafe-brown/40"
-                )}
-              >
-                <QrCode size={24} className="mb-2" />
-                <span className="text-sm font-semibold tracking-wide">QRIS</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPaymentMethod("cash")}
-                className={cn(
-                  "flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-200",
-                  paymentMethod === "cash"
-                    ? "border-cafe-brown bg-cafe-brown/5 text-cafe-brown"
-                    : "border-cafe-sand bg-white text-cafe-charcoal/60 hover:border-cafe-brown/40"
-                )}
-              >
-                <Banknote size={24} className="mb-2" />
-                <span className="text-sm font-semibold tracking-wide">Cash</span>
-              </button>
-            </div>
-
-            {/* Conditional Payment Info */}
-            {paymentMethod === "qris" ? (
-              <div className="border-2 border-dashed border-cafe-sand rounded-2xl p-6 text-center mb-6 bg-white animate-in fade-in zoom-in-95">
-                <div className="w-16 h-16 bg-cafe-charcoal rounded-xl flex items-center justify-center mx-auto mb-4 text-white">
-                  <QrCode size={32} />
-                </div>
-                <h4 className="font-bold text-cafe-charcoal text-lg mb-1">Scan to Pay (QRIS)</h4>
-                <p className="text-xs text-cafe-charcoal/50">
-                  Open your e-wallet or banking app to scan the QR code above.
-                </p>
-              </div>
-            ) : (
-              <div className="border-2 border-dashed border-cafe-sand rounded-2xl p-6 text-center mb-6 bg-cafe-cream/30 animate-in fade-in zoom-in-95">
-                <div className="w-16 h-16 bg-cafe-sand/50 rounded-xl flex items-center justify-center mx-auto mb-4 text-cafe-charcoal">
-                  <Banknote size={32} />
-                </div>
-                <h4 className="font-bold text-cafe-charcoal text-lg mb-1">Pay at Cashier</h4>
-                <p className="text-xs text-cafe-charcoal/60">
-                  Your table will be reserved. Please finalize your payment using cash when you arrive at Savoria Billiards.
-                </p>
-              </div>
-            )}
-
-            <button
-              onClick={handlePaymentSuccess}
-              className="w-full flex items-center justify-center px-6 py-4 bg-cafe-charcoal text-cafe-cream rounded-full text-sm font-semibold tracking-wider uppercase hover:bg-cafe-dark transition-all duration-300"
-            >
-              {paymentMethod === "qris" ? (
-                <>
-                  <Wallet size={16} className="mr-2" />
-                  I Have Paid
-                </>
-              ) : (
-                <>
-                  <Check size={16} className="mr-2" />
-                  Confirm Booking
-                </>
-              )}
-            </button>
           </div>
         </div>
       </section>
@@ -351,65 +359,69 @@ export function ReservationSection() {
                 Select Table
               </label>
               <select
-                value={selectedTable}
-                onChange={(e) => setSelectedTable(e.target.value)}
+                value={selectedTableId}
+                onChange={(e) => setSelectedTableId(e.target.value)}
                 required
                 className="w-full px-4 py-3 bg-white border border-cafe-sand rounded-xl text-sm text-cafe-charcoal focus:outline-none focus:ring-2 focus:ring-cafe-brown/20 focus:border-cafe-brown/40 transition-all"
               >
                 <option value="">Choose a table...</option>
-                <option value="Table 01">Table 01 (Standard)</option>
-                <option value="Table 02">Table 02 (Standard)</option>
-                <option value="Table 03">Table 03 (Standard)</option>
-                <option value="Table 04">Table 04 (Standard)</option>
-                <option value="VIP 01">VIP 01 (Premium)</option>
-                <option value="VIP 02">VIP 02 (Premium)</option>
+                {tables.map(table => (
+                   <option key={table.id} value={table.id}>{table.name} ({formatIDR(Number(table.price))})</option>
+                ))}
               </select>
             </div>
 
-            {/* Time */}
+            {/* Date */}
+            <div>
+              <label className="block text-xs font-semibold text-cafe-charcoal tracking-wide uppercase mb-2">
+                <Calendar size={12} className="inline mr-1.5" />
+                Date
+              </label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+                className="w-full px-4 py-3 bg-white border border-cafe-sand rounded-xl text-sm text-cafe-charcoal focus:outline-none focus:ring-2 focus:ring-cafe-brown/20 focus:border-cafe-brown/40 transition-all"
+              />
+            </div>
+
+            {/* Schedule */}
             <div>
               <label className="block text-xs font-semibold text-cafe-charcoal tracking-wide uppercase mb-2">
                 <Clock size={12} className="inline mr-1.5" />
-                Start Time
+                Time Slot
               </label>
               <select
-                value={selectedTime}
-                onChange={(e) => setSelectedTime(e.target.value)}
+                value={selectedScheduleId}
+                onChange={(e) => setSelectedScheduleId(e.target.value)}
                 required
                 className="w-full px-4 py-3 bg-white border border-cafe-sand rounded-xl text-sm text-cafe-charcoal focus:outline-none focus:ring-2 focus:ring-cafe-brown/20 focus:border-cafe-brown/40 transition-all"
               >
-                <option value="">Select time</option>
-                {TIME_SLOTS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                <option value="">Select time slot</option>
+                {schedules.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.start_time} - {s.end_time}
                   </option>
                 ))}
               </select>
             </div>
-
-            {/* Duration */}
-            <div className="md:col-span-2 flex flex-col items-center">
-              <label className="flex items-center justify-center text-xs font-semibold text-cafe-charcoal tracking-wide uppercase mb-2">
-                <Timer size={12} className="mr-1.5" />
-                Duration (Hours)
+            
+            {/* Guest Count */}
+            <div>
+              <label className="block text-xs font-semibold text-cafe-charcoal tracking-wide uppercase mb-2">
+                <Users size={12} className="inline mr-1.5" />
+                Guests
               </label>
-              <div className="flex flex-wrap justify-center gap-2">
-                {DURATION_OPTIONS.map((h) => (
-                  <button
-                    key={h}
-                    type="button"
-                    onClick={() => setDuration(h)}
-                    className={cn(
-                      "w-10 h-10 rounded-xl text-sm font-medium border transition-all duration-200",
-                      duration === h
-                        ? "bg-cafe-charcoal text-cafe-cream border-cafe-charcoal"
-                        : "bg-white text-cafe-charcoal border-cafe-sand hover:border-cafe-brown/40"
-                    )}
-                  >
-                    {h}
-                  </button>
-                ))}
-              </div>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={guestCount}
+                onChange={(e) => setGuestCount(Number(e.target.value))}
+                required
+                className="w-full px-4 py-3 bg-white border border-cafe-sand rounded-xl text-sm text-cafe-charcoal placeholder:text-cafe-charcoal/40 focus:outline-none focus:ring-2 focus:ring-cafe-brown/20 focus:border-cafe-brown/40 transition-all"
+              />
             </div>
 
             {/* Notes */}
@@ -427,17 +439,56 @@ export function ReservationSection() {
               />
             </div>
           </div>
+          
+          <div className="mt-8 pt-8 border-t border-cafe-sand/50">
+             {/* Payment Options Selector */}
+             <label className="block text-xs font-semibold text-cafe-charcoal tracking-wide uppercase mb-4 text-center">
+                Payment Method
+              </label>
+             <div className="grid grid-cols-2 gap-3 mb-6 max-w-sm mx-auto">
+              <button
+                type="button"
+                onClick={() => setPaymentMethod("qris")}
+                className={cn(
+                  "flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-200",
+                  paymentMethod === "qris"
+                    ? "border-cafe-brown bg-cafe-brown/5 text-cafe-brown"
+                    : "border-cafe-sand bg-white text-cafe-charcoal/60 hover:border-cafe-brown/40"
+                )}
+              >
+                <QrCode size={24} className="mb-2" />
+                <span className="text-sm font-semibold tracking-wide">QRIS</span>
+              </button>
 
-          <div className="mt-8 text-center">
-            <button
-              type="submit"
-              className="px-10 py-4 bg-cafe-brown text-white rounded-full text-sm font-semibold tracking-wider uppercase hover:bg-cafe-brown/90 transition-all duration-300 hover:shadow-lg hover:shadow-cafe-brown/20"
-            >
-              Proceed to Payment
-            </button>
-            <p className="mt-3 text-xs text-cafe-charcoal/60 font-light">
-              You will be asked to review your total before paying
-            </p>
+              <button
+                type="button"
+                onClick={() => setPaymentMethod("cash")}
+                className={cn(
+                  "flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-200",
+                  paymentMethod === "cash"
+                    ? "border-cafe-brown bg-cafe-brown/5 text-cafe-brown"
+                    : "border-cafe-sand bg-white text-cafe-charcoal/60 hover:border-cafe-brown/40"
+                )}
+              >
+                <Banknote size={24} className="mb-2" />
+                <span className="text-sm font-semibold tracking-wide">Cash</span>
+              </button>
+            </div>
+            
+            <div className="flex justify-between items-center mb-6 max-w-sm mx-auto bg-cafe-cream p-4 rounded-xl border border-cafe-sand/50">
+                <span className="font-semibold text-cafe-charcoal">Total Amount</span>
+                <span className="font-display text-xl text-cafe-brown font-semibold">{formatIDR(totalAmount)}</span>
+            </div>
+
+            <div className="text-center">
+                <button
+                type="submit"
+                disabled={createReservation.isPending || createPayment.isPending}
+                className="px-10 py-4 w-full md:w-auto bg-cafe-brown text-white rounded-full text-sm font-semibold tracking-wider uppercase hover:bg-cafe-brown/90 transition-all duration-300 hover:shadow-lg hover:shadow-cafe-brown/20 disabled:opacity-50"
+                >
+                {(createReservation.isPending || createPayment.isPending) ? "Processing..." : "Proceed to Payment"}
+                </button>
+            </div>
           </div>
         </form>
       </div>
