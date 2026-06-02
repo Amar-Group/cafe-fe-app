@@ -23,6 +23,7 @@ import { usePublicSchedules } from "@/features/billiard/schedule/hooks/use-sched
 import { Schedule } from "@/features/billiard/schedule/types";
 import { useCreateReservation, useReservation, useReservations } from "@/features/billiard/reservation/hooks/use-reservation";
 import { useCreatePayment, useUpdatePayment } from "@/features/payment/hooks/use-payment";
+import { PaymentService } from "@/features/payment/services/payment-service";
 import { useNotification } from "@/components/ui/notification";
 
 // Simulated hourly rates
@@ -161,10 +162,7 @@ export function BilliardSection() {
               (window as any).snap.pay(result.snap_token, {
                 onSuccess: async function () {
                   try {
-                    await updatePayment.mutateAsync({
-                      id: result.id,
-                      data: { status: "paid", paid_at: new Date().toISOString() },
-                    });
+                    await PaymentService.sync(result.id);
                     notify({
                       title: "Success",
                       message: "Payment successful. Your reservation is confirmed.",
@@ -173,10 +171,13 @@ export function BilliardSection() {
                     setStep("success");
                   } catch (err) {
                     notify({
-                      title: "Status Update Failed",
-                      message: "Payment succeeded but failed to update status.",
-                      variant: "danger",
+                      title: "Status Update Pending",
+                      message: "Payment succeeded but syncing with server is delayed. Polling will continue.",
+                      variant: "warning",
                     });
+                  } finally {
+                    setIsSubmitting(false);
+                    setStep("waiting-payment"); // Background polling will transition it to success once synced
                   }
                 },
                 onPending: function () {
@@ -372,8 +373,8 @@ export function BilliardSection() {
                       const timeStr = `${schedule.start_time.slice(0, 5)} - ${schedule.end_time.slice(0, 5)}`;
                       const todayStr = new Date().toISOString().split('T')[0];
                       
-                      const isBooked = (allReservations || []).some(
-                        (res) => 
+                      const isBooked = ((allReservations as any[]) || []).some(
+                        (res: any) => 
                           res.billiard_table_id === selectedTable?.id &&
                           res.schedule_id === schedule.id &&
                           res.status !== "cancelled" &&

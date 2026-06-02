@@ -25,4 +25,10 @@ export class PaymentService {
       body: JSON.stringify(payload),
     });
   }
+
+  static async sync(id: number): Promise<ApiResponse<any>> {
+    return apiClient<ApiResponse<any>>(`/api/payments/${id}/sync`, {
+      method: "POST",
+    });
+  }
 }

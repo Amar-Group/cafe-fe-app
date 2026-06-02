@@ -88,7 +88,7 @@ export function FeaturedMenuSection() {
   const [activeTab, setActiveTab] = useState<"cafe" | "billiard">("cafe");
 
   // --- Global Reveal Hook ---
-  const ref = useScrollReveal([activeTab]);
+  // (Moved below state declarations to avoid ReferenceError)
 
   // --- Cafe State ---
   const { data: dishCategories } = usePublicDishCategories();
@@ -96,6 +96,9 @@ export function FeaturedMenuSection() {
 
   const [showAllMenu, setShowAllMenu] = useState(false);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  // --- Global Reveal Hook ---
+  const ref = useScrollReveal([activeTab, publicDishes?.length, showAllMenu]);
 
   const apiSignatureItems = (publicDishes || []).slice(0, 8).map((dish, idx) => {
     const badges = [
