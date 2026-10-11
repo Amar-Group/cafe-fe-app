@@ -90,20 +90,30 @@ export function ReservationSection() {
         status: "pending",
       });
 
-      const newReservationId = resData.data?.id;
-      if (!newReservationId) throw new Error("Failed to create reservation");
+      let extractedId: number | null = null;
+      if (Array.isArray(resData.data) && (resData.data[0] as any)?.insertId) {
+        extractedId = Number((resData.data[0] as any).insertId);
+      } else if (resData.data?.id) {
+        extractedId = Number(resData.data.id);
+      } else if ((resData as any)?.id) {
+        extractedId = Number((resData as any).id);
+      } else if (typeof resData.data === "number" || typeof resData.data === "string") {
+        extractedId = Number(resData.data);
+      }
 
-      setCreatedReservationId(newReservationId);
+      if (!extractedId) throw new Error("Failed to create reservation");
+
+      setCreatedReservationId(extractedId);
       setFinalAmount(totalAmount);
 
       // 2. Process Payment
       if (paymentMethod === "qris") {
         const paymentRes = await createPayment.mutateAsync({
           type: "reservation",
-          reservation_id: newReservationId,
+          reservation_id: extractedId,
           method: "qris",
           provider: "midtrans",
-          gross_amount: totalAmount,
+          gross_amount: totalAmount.toString(),
         });
 
         const snapToken = paymentRes.data?.snap_token;
@@ -133,10 +143,10 @@ export function ReservationSection() {
         // Cash payment
         await createPayment.mutateAsync({
           type: "reservation",
-          reservation_id: newReservationId,
+          reservation_id: extractedId,
           method: "cash",
           provider: "cashier",
-          gross_amount: totalAmount,
+          gross_amount: totalAmount.toString(),
         });
         setStep("waiting-payment");
       }
